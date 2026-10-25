@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Futbol Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 font-sans">
+  <div class="max-w-2xl mx-auto space-y-6">
+    <header class="text-center py-4 border-b border-slate-800">
+      <h1 class="text-2xl font-bold text-emerald-400">⚽ App de Fútbol</h1>
+      <p class="text-slate-400 text-sm">Tablas de posiciones y próximos partidos</p>
+    </header>
+
+    <!-- Selector de Liga -->
+    <div class="flex gap-2">
+      <select id="leagueSelect" class="bg-slate-800 text-white p-3 rounded-lg w-full border border-slate-700">
+        <option value="261">LPF Panamá</option>
+        <option value="140">LaLiga (España)</option>
+        <option value="39">Premier League (Inglaterra)</option>
+        <option value="2">UEFA Champions League</option>
+      </select>
+      <button onclick="cargarTabla()" class="bg-emerald-500 hover:bg-emerald-600 px-5 rounded-lg font-bold text-slate-950">
+        Cargar
+      </button>
+    </div>
+
+    <!-- Indicador de Estado -->
+    <div id="status" class="text-xs text-amber-400 text-center">Modo Local</div>
+
+    <!-- Contenedor Tabla -->
+    <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 shadow-xl overflow-x-auto">
+      <h2 class="text-lg font-semibold mb-3 text-slate-200">Tabla de Posiciones</h2>
+      <table class="w-full text-left text-sm">
+        <thead class="text-slate-400 border-b border-slate-700">
+          <tr>
+            <th class="pb-2">#</th>
+            <th class="pb-2">Equipo</th>
+            <th class="pb-2 text-center">PJ</th>
+            <th class="pb-2 text-center">Pts</th>
+          </tr>
+        </thead>
+        <tbody id="tablaBody" class="divide-y divide-slate-800">
+          <tr><td colspan="4" class="py-4 text-center text-slate-500">Selecciona una liga...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const VERCEL_URL = "URL_DE_TU_VERCEL_AQUI"; 
+
+    const DATOS_LOCAL_PRUEBA = [
+      { rank: 1, team: { name: "Plaza Amador", logo: "https://media.api-sports.io/football/teams/3630.png" }, all: { played: 10 }, points: 22 },
+      { rank: 2, team: { name: "Tauro FC", logo: "https://media.api-sports.io/football/teams/3631.png" }, all: { played: 10 }, points: 19 },
+      { rank: 3, team: { name: "CAI La Chorrera", logo: "https://media.api-sports.io/football/teams/3629.png" }, all: { played: 10 }, points: 17 }
+    ];
+
+    async function cargarTabla() {
+      const leagueId = document.getElementById('leagueSelect').value;
+      const tbody = document.getElementById('tablaBody');
+      const status = document.getElementById('status');
+      tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-slate-400">Cargando datos...</td></tr>';
+
+      if (VERCEL_URL.includes("URL_DE_TU_VERCEL")) {
+        status.innerText = "Mostrando datos simulados en local";
+        renderizarTabla(DATOS_LOCAL_PRUEBA);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${VERCEL_URL}/api/futbol?type=standings&league=${leagueId}`);
+        const json = await res.json();
+        status.innerText = `Origen: ${json.origen === 'cache' ? 'Caché servidor' : 'API Real en vivo'}`;
+        
+        const standings = json.data[0].league.standings[0];
+        renderizarTabla(standings);
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-400">Error: ${err.message}</td></tr>`;
+      }
+    }
+
+    function renderizarTabla(filas) {
+      const tbody = document.getElementById('tablaBody');
+      tbody.innerHTML = filas.map(item => `
+        <tr class="hover:bg-slate-800/80">
+          <td class="py-3 font-bold ${item.rank <= 3 ? 'text-emerald-400' : 'text-slate-400'}">${item.rank}</td>
+          <td class="py-3 flex items-center gap-2">
+            <img src="${item.team.logo}" class="w-5 h-5 object-contain" alt="">
+            <span>${item.team.name}</span>
+          </td>
+          <td class="py-3 text-center text-slate-400">${item.all.played}</td>
+          <td class="py-3 text-center font-bold text-slate-100">${item.points}</td>
+        </tr>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
+  <title></title>
+</head>
+
+<body>
+  
+</body>
+
+</html>

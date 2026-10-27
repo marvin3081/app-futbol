@@ -1,4 +1,4 @@
-{}{
+{
   "name": "app-futbol",
   "version": "1.0.0",
   "private": true,
@@ -6,4 +6,3 @@
     "start": "node api/futbol.js"
   }
 }
-""""

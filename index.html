@@ -1,8 +1,7 @@
 <!DOCTYPE html>
-
 <html lang="es">
 <head>
-   <meta charset="UTF-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Futbol Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -28,7 +27,7 @@
     </div>
 
     <!-- Indicador de Estado -->
-    <div id="status" class="text-xs text-amber-400 text-center">Modo Local</div>
+    <div id="status" class="text-xs text-amber-400 text-center">Conectado a la API</div>
 
     <!-- Contenedor Tabla -->
     <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 shadow-xl overflow-x-auto">
@@ -50,13 +49,7 @@
   </div>
 
   <script>
-    const VERCEL_URL = "URL_DE_TU_VERCEL_AQUI"; 
-
-    const DATOS_LOCAL_PRUEBA = [
-      { rank: 1, team: { name: "Plaza Amador", logo: "https://media.api-sports.io/football/teams/3630.png" }, all: { played: 10 }, points: 22 },
-      { rank: 2, team: { name: "Tauro FC", logo: "https://media.api-sports.io/football/teams/3631.png" }, all: { played: 10 }, points: 19 },
-      { rank: 3, team: { name: "CAI La Chorrera", logo: "https://media.api-sports.io/football/teams/3629.png" }, all: { played: 10 }, points: 17 }
-    ];
+    const VERCEL_URL = ""; 
 
     async function cargarTabla() {
       const leagueId = document.getElementById('leagueSelect').value;
@@ -64,7 +57,13 @@
       const status = document.getElementById('status');
       tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-slate-400">Cargando datos...</td></tr>';
 
-    
+      try {
+        const res = await fetch(`${VERCEL_URL}/api/futbol?type=standings&league=${leagueId}`);
+        const json = await res.json();
+        
+        if (json.error) {
+          throw new Error(json.error);
+        }
 
         status.innerText = `Origen: ${json.origen === 'cache' ? 'Caché servidor' : 'API Real en vivo'}`;
         
@@ -91,12 +90,4 @@
     }
   </script>
 </body>
-</html>
-  <title></title>
-</head>
-
-<body>
-  
-</body>
-
 </html>

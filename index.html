@@ -64,15 +64,8 @@
       const status = document.getElementById('status');
       tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-slate-400">Cargando datos...</td></tr>';
 
-      if (VERCEL_URL.includes("URL_DE_TU_VERCEL")) {
-        status.innerText = "Mostrando datos simulados en local";
-        renderizarTabla(DATOS_LOCAL_PRUEBA);
-        return;
-      }
+    
 
-      try {
-        const res = await fetch(`${VERCEL_URL}/api/futbol?type=standings&league=${leagueId}`);
-        const json = await res.json();
         status.innerText = `Origen: ${json.origen === 'cache' ? 'Caché servidor' : 'API Real en vivo'}`;
         
         const standings = json.data[0].league.standings[0];

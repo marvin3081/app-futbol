@@ -10,24 +10,34 @@
   <div class="max-w-2xl mx-auto space-y-6">
     <header class="text-center py-4 border-b border-slate-800">
       <h1 class="text-2xl font-bold text-emerald-400">⚽ App de Fútbol</h1>
-      <p class="text-slate-400 text-sm">Tablas de posiciones y próximos partidos</p>
+      <p class="text-slate-400 text-sm">Tablas de posiciones</p>
     </header>
 
     <!-- Selector de Liga -->
     <div class="flex gap-2">
+      <label for="leagueSelect" class="sr-only">Liga</label>
       <select id="leagueSelect" class="bg-slate-800 text-white p-3 rounded-lg w-full border border-slate-700">
         <option value="261">LPF Panamá</option>
         <option value="140">LaLiga (España)</option>
         <option value="39">Premier League (Inglaterra)</option>
+        <option value="135">Serie A (Italia)</option>
+        <option value="78">Bundesliga (Alemania)</option>
+        <option value="61">Ligue 1 (Francia)</option>
+        <option value="262">Liga MX (México)</option>
+        <option value="253">MLS (EE. UU.)</option>
+        <option value="71">Brasileirão (Brasil)</option>
+        <option value="128">Liga Profesional (Argentina)</option>
         <option value="2">UEFA Champions League</option>
+        <option value="3">UEFA Europa League</option>
+        <option value="13">Copa Libertadores</option>
       </select>
-      <button onclick="cargarTabla()" class="bg-emerald-500 hover:bg-emerald-600 px-5 rounded-lg font-bold text-slate-950">
+      <button id="btnCargar" class="bg-emerald-500 hover:bg-emerald-600 px-5 rounded-lg font-bold text-slate-950">
         Cargar
       </button>
     </div>
 
     <!-- Indicador de Estado -->
-    <div id="status" class="text-xs text-amber-400 text-center">Conectado a la API</div>
+    <div id="status" class="text-xs text-amber-400 text-center"></div>
 
     <!-- Contenedor Tabla -->
     <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 shadow-xl overflow-x-auto">
@@ -49,7 +59,10 @@
   </div>
 
   <script>
-    const VERCEL_URL = ""; 
+    const VERCEL_URL = "";
+
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     async function cargarTabla() {
       const leagueId = document.getElementById('leagueSelect').value;
@@ -60,17 +73,20 @@
       try {
         const res = await fetch(`${VERCEL_URL}/api/futbol?type=standings&league=${leagueId}`);
         const json = await res.json();
-        
-        if (json.error) {
-          throw new Error(json.error);
+
+        if (json.error) throw new Error(json.error);
+
+        const standings = json.data?.[0]?.league?.standings?.[0];
+        if (!standings?.length) {
+          const e = json.errors && Object.values(json.errors)[0];
+          throw new Error(e || "No hay datos de tabla para esta liga.");
         }
 
-        status.innerText = `Origen: ${json.origen === 'cache' ? 'Caché servidor' : 'API Real en vivo'}`;
-        
-        const standings = json.data[0].league.standings[0];
+        status.innerText = `Temporada ${json.season} · Llamadas restantes hoy: ${json.remaining ?? '?'}`;
         renderizarTabla(standings);
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-400">Error: ${err.message}</td></tr>`;
+        status.innerText = "";
+        tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-400">${esc(err.message)}</td></tr>`;
       }
     }
 
@@ -78,16 +94,20 @@
       const tbody = document.getElementById('tablaBody');
       tbody.innerHTML = filas.map(item => `
         <tr class="hover:bg-slate-800/80">
-          <td class="py-3 font-bold ${item.rank <= 3 ? 'text-emerald-400' : 'text-slate-400'}">${item.rank}</td>
+          <td class="py-3 font-bold ${item.rank <= 3 ? 'text-emerald-400' : 'text-slate-400'}">${esc(item.rank)}</td>
           <td class="py-3 flex items-center gap-2">
-            <img src="${item.team.logo}" class="w-5 h-5 object-contain" alt="">
-            <span>${item.team.name}</span>
+            <img src="${esc(item.team.logo)}" class="w-5 h-5 object-contain" alt="" onerror="this.style.visibility='hidden'">
+            <span>${esc(item.team.name)}</span>
           </td>
-          <td class="py-3 text-center text-slate-400">${item.all.played}</td>
-          <td class="py-3 text-center font-bold text-slate-100">${item.points}</td>
+          <td class="py-3 text-center text-slate-400">${esc(item.all.played)}</td>
+          <td class="py-3 text-center font-bold text-slate-100">${esc(item.points)}</td>
         </tr>
       `).join('');
     }
+
+    document.getElementById('leagueSelect').addEventListener('change', cargarTabla);
+    document.getElementById('btnCargar').addEventListener('click', cargarTabla);
+    cargarTabla();
   </script>
 </body>
 </html>

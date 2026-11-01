@@ -1,110 +1,61 @@
-let cacheDatos = {};
-let ultimaActualizacion = {};
-
-// Normaliza textos como "Real Madrid" a "real-madrid"
-function formatearSlug(texto) {
-    return texto
-        .toLowerCase()
-        .trim()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-}
+const BASE = 'https://sportapi.ai/api';
 
 export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
+  const key = (process.env.SPORTAPI_API_KEY || process.env.SPORTAPI_KEY || '').trim();
+  if (!key) return res.status(500).json({ error: 'Falta SPORTAPI_API_KEY en Vercel' });
 
-    const { type = 'today_matches', query = '', id = '', date = '' } = req.query;
-    const cleanKey = `${type}_${query || id || date}`.toLowerCase().trim();
-    const AHORA = Date.now();
+  const { type = 'leagues', slug = '', id = '', league = '', date = '' } = req.query;
 
-    const TIEMPO_CACHE = type === 'today_matches' ? 15 * 60 * 1000 : 6 * 60 * 60 * 1000;
+  const okSlug = /^[a-z0-9-]+$/;
+  let path, ttl;
 
-    if (cacheDatos[cleanKey] && Array.isArray(cacheDatos[cleanKey]) && cacheDatos[cleanKey].length > 0 && (AHORA - ultimaActualizacion[cleanKey] < TIEMPO_CACHE)) {
-        return res.status(200).json({ origen: 'cache', data: cacheDatos[cleanKey] });
+  if (type === 'leagues') {
+    path = '/leagues'; ttl = 86400;
+  } else if (type === 'league') {
+    if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'id inválido' });
+    path = `/leagues/${id}`; ttl = 21600;
+  } else if (type === 'standings') {
+    if (!okSlug.test(league)) return res.status(400).json({ error: 'league inválida' });
+    path = `/standings/${league}`; ttl = 21600;
+  } else if (type === 'team') {
+    if (!okSlug.test(slug)) return res.status(400).json({ error: 'slug inválido' });
+    path = `/teams/slug/${slug}`; ttl = 3600;
+  } else if (type === 'team_id') {
+    if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'id inválido' });
+    path = `/teams/${id}`; ttl = 3600;
+  } else if (type === 'day') {
+    const f = date || new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return res.status(400).json({ error: 'fecha inválida' });
+    path = `/fixtures/date/${f}`; ttl = 900;
+  } else {
+    return res.status(400).json({ error: 'Tipo no soportado' });
+  }
+
+  try {
+    const r = await fetch(BASE + path, {
+      headers: { 'X-Api-Key': key, 'Accept': 'application/json' }
+    });
+    const texto = await r.text();
+    let json;
+    try { json = JSON.parse(texto); } catch { json = null; }
+
+    const remaining = r.headers.get('x-ratelimit-remaining');
+    const monthRemaining = r.headers.get('x-ratelimit-month-remaining');
+
+    if (!r.ok || !json || json.success === false) {
+      return res.status(r.status === 200 ? 502 : r.status).json({
+        error: json?.error || `SportAPI respondió ${r.status}`,
+        path, remaining, monthRemaining
+      });
     }
 
-    // Busca SPORTAPI_API_KEY, SPORTAPI_KEY o el nombre previo
-    const apiKey = (
-        process.env.SPORTAPI_API_KEY || 
-        process.env.SPORTAPI_KEY || 
-        process.env.API_FOOTBALL_KEY || 
-        ''
-    ).trim();
-
-    if (!apiKey) {
-        return res.status(500).json({ 
-            error: 'Falta la clave en Vercel. Verifica que SPORTAPI_API_KEY tenga tu sk_live_... en Value.' 
-        });
-    }
-
-    let endpointUrl = '';
-    const fecha = date || new Date().toISOString().split('T')[0];
-
-    if (type === 'today_matches') {
-        endpointUrl = `https://sportapi.ai/api/matches?date=${fecha}`;
-    } else if (type === 'search') {
-        if (!query.trim()) return res.status(400).json({ error: 'Ingresa un nombre.' });
-        const slug = formatearSlug(query);
-        endpointUrl = `https://sportapi.ai/api/teams/slug/${slug}`;
-    } else if (type === 'matches') {
-        if (!id) return res.status(400).json({ error: 'Falta el ID del equipo.' });
-        endpointUrl = `https://sportapi.ai/api/teams/${id}/matches`;
-    } else {
-        endpointUrl = `https://sportapi.ai/api/matches?date=${fecha}`;
-    }
-
-    try {
-        const response = await fetch(endpointUrl, {
-            method: 'GET',
-            headers: {
-                'X-Api-Key': apiKey,
-                'Accept': 'application/json'
-            }
-        });
-
-        const rawText = await response.text();
-        let json;
-        try {
-            json = JSON.parse(rawText);
-        } catch (e) {
-            return res.status(response.status).json({
-                error: `HTTP ${response.status}: Respuesta no válida`,
-                detalle: rawText.substring(0, 160)
-            });
-        }
-
-        if (!response.ok) {
-            return res.status(response.status).json({
-                error: json.message || json.error || `Error HTTP ${response.status}`,
-                detalles: json
-            });
-        }
-
-        let lista = [];
-        if (Array.isArray(json)) {
-            lista = json;
-        } else if (Array.isArray(json.data)) {
-            lista = json.data;
-        } else if (Array.isArray(json.matches)) {
-            lista = json.matches;
-        } else if (typeof json === 'object' && (json.id || json.name || json.slug)) {
-            lista = [json];
-        }
-
-        if (lista.length > 0) {
-            cacheDatos[cleanKey] = lista;
-            ultimaActualizacion[cleanKey] = AHORA;
-        }
-
-        return res.status(200).json({ origen: 'api_real', data: lista });
-    } catch (error) {
-        return res.status(500).json({ error: 'Fallo al conectar', detalle: error.message });
-    }
+    res.setHeader('Cache-Control', `s-maxage=${ttl}, stale-while-revalidate=600`);
+    return res.status(200).json({ ...json, remaining, monthRemaining });
+  } catch (e) {
+    return res.status(500).json({ error: 'Error de conexión', details: e.message });
+  }
 }
-

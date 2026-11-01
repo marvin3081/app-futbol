@@ -19,7 +19,7 @@
       <input 
         id="searchInput" 
         type="text" 
-        placeholder="Ej: Panamá, Real Madrid, Concacaf..." 
+        placeholder="Ej: Arsenal, Real Madrid, Chelsea..." 
         class="bg-slate-900 text-white px-4 py-3 rounded-xl w-full border border-slate-800 focus:outline-none focus:border-emerald-500 transition-all text-sm"
         onkeydown="if(event.key === 'Enter') ejecutarBusqueda()"
       />
@@ -37,8 +37,9 @@
         📅 Partidos de Hoy
       </button>
       <button onclick="buscarAtajo('Panama')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">🇵🇦 Panamá</button>
-      <button onclick="buscarAtajo('Concacaf')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">🌎 Concacaf</button>
+      <button onclick="buscarAtajo('Arsenal')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">🔴 Arsenal</button>
       <button onclick="buscarAtajo('Real Madrid')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">⚪ Real Madrid</button>
+      <button onclick="buscarAtajo('Chelsea')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">🔵 Chelsea</button>
     </div>
 
     <!-- Estado -->
@@ -77,7 +78,10 @@
         const res = await fetch(`/api/futbol?type=today_matches`);
         const json = await res.json();
 
-        if (json.error) throw new Error(json.error);
+        if (!res.ok || json.error) {
+          const detalle = json.error || (json.detalles ? JSON.stringify(json.detalles) : `HTTP ${res.status}`);
+          throw new Error(detalle);
+        }
 
         const partidos = Array.isArray(json.data) ? json.data : [];
 
@@ -90,27 +94,37 @@
         status.innerText = `Origen: ${json.origen === 'cache' ? 'Caché' : 'En vivo'} · ${partidos.length} encuentros hoy`;
         renderizarPartidosHoy(partidos);
       } catch (err) {
-        status.innerText = "Error";
-        contenedor.innerHTML = `<div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-center text-red-300 text-xs">${err.message}</div>`;
+        status.innerText = "Error detectado";
+        contenedor.innerHTML = `
+          <div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-left text-red-300 text-xs font-mono space-y-1">
+            <p class="font-bold text-red-200">Fallo en la consulta:</p>
+            <p class="break-all">${err.message}</p>
+          </div>`;
       }
     }
 
     function renderizarPartidosHoy(lista) {
       const contenedor = document.getElementById('contenedorResultados');
       contenedor.innerHTML = lista.map(p => {
-        const local = p.home_team?.name || p.home_team || 'Local';
-        const visita = p.away_team?.name || p.away_team || 'Visita';
-        const torneo = p.competition?.name || p.league?.name || 'Competición';
-        const estado = p.status || 'Programado';
+        const local = p.home_team?.name || p.home_team || p.team_home || 'Local';
+        const visita = p.away_team?.name || p.away_team || p.team_away || 'Visita';
+        const torneo = p.competition?.name || p.league?.name || p.competition_name || 'Competición';
+        const estado = p.status || p.match_status || 'Programado';
 
         let horaTexto = '--:--';
-        if (p.kickoff_utc || p.date) {
-          const fechaObj = new Date(p.kickoff_utc || p.date);
-          horaTexto = fechaObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const fechaCruda = p.kickoff_utc || p.date || p.match_time || p.start_time;
+        if (fechaCruda) {
+          const fechaObj = new Date(fechaCruda);
+          if (!isNaN(fechaObj.getTime())) {
+            horaTexto = fechaObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }
         }
 
-        const marcador = (p.home_score !== undefined && p.home_score !== null)
-          ? `${p.home_score} - ${p.away_score}`
+        const hScore = p.home_score ?? p.score_home ?? p.score?.home;
+        const aScore = p.away_score ?? p.score_away ?? p.score?.away;
+
+        const marcador = (hScore !== undefined && hScore !== null && aScore !== undefined && aScore !== null)
+          ? `${hScore} - ${aScore}`
           : horaTexto;
 
         return `
@@ -144,18 +158,28 @@
       try {
         const res = await fetch(`/api/futbol?type=search&query=${encodeURIComponent(query)}`);
         const json = await res.json();
-        if (json.error) throw new Error(json.error);
+        
+        if (!res.ok || json.error) {
+          const detalle = json.error || (json.detalles ? JSON.stringify(json.detalles) : `HTTP ${res.status}`);
+          throw new Error(detalle);
+        }
 
         const items = Array.isArray(json.data) ? json.data : [];
         if (items.length === 0) {
-          contenedor.innerHTML = '<div class="py-8 text-center text-slate-500 text-sm">Sin coincidencias.</div>';
+          status.innerText = "Sin resultados";
+          contenedor.innerHTML = '<div class="py-8 text-center text-slate-500 text-sm">No se encontraron datos para este término.</div>';
           return;
         }
 
-        status.innerText = `${items.length} resultados (${json.origen === 'cache' ? 'Caché' : 'En vivo'})`;
+        status.innerText = `${items.length} coincidencia(s) (${json.origen === 'cache' ? 'Caché' : 'En vivo'})`;
         renderizarLista(items);
       } catch (err) {
-        contenedor.innerHTML = `<div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-center text-red-300 text-xs">${err.message}</div>`;
+        status.innerText = "Error en la búsqueda";
+        contenedor.innerHTML = `
+          <div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-left text-red-300 text-xs font-mono space-y-1">
+            <p class="font-bold text-red-200">Fallo en la búsqueda:</p>
+            <p class="break-all">${err.message}</p>
+          </div>`;
       } finally {
         btn.disabled = false;
       }
@@ -164,10 +188,10 @@
     function renderizarLista(lista) {
       const contenedor = document.getElementById('contenedorResultados');
       contenedor.innerHTML = lista.map(item => {
-        const id = item.id || item.team?.id || '';
-        const nombre = item.name || item.team?.name || 'Sin nombre';
-        const pais = item.country?.name || item.country || 'Internacional';
-        const logo = item.logo || item.team?.logo || 'https://via.placeholder.com/64?text=⚽';
+        const id = item.id || item.team_id || '';
+        const nombre = item.name || item.team_name || 'Sin nombre';
+        const pais = item.country?.name || item.country || item.country_name || 'Internacional';
+        const logo = item.logo || item.logo_url || 'https://via.placeholder.com/64?text=⚽';
 
         return `
           <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3 flex items-center justify-between hover:border-slate-700">
@@ -179,7 +203,7 @@
               </div>
             </div>
             ${id ? `
-              <button onclick="verPartidos('${id}', '${nombre.replace(/'/g, "\\'")}')" class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+              <button onclick="verPartidos('${id}', '${nombre.replace(/'/g, "\\'")}')" class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg hover:bg-emerald-500/20">
                 📊 Forma
               </button>
             ` : ''}
@@ -200,7 +224,7 @@
       try {
         const res = await fetch(`/api/futbol?type=matches&id=${id}`);
         const json = await res.json();
-        if (json.error) throw new Error(json.error);
+        if (!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`);
 
         const matches = Array.isArray(json.data) ? json.data : [];
         if (matches.length === 0) {
@@ -222,7 +246,7 @@
           `;
         }).join('');
       } catch (err) {
-        contenido.innerHTML = `<div class="text-red-400 text-center py-2">${err.message}</div>`;
+        contenido.innerHTML = `<div class="text-red-400 text-center py-2 text-xs">${err.message}</div>`;
       }
     }
 

@@ -22,14 +22,12 @@ export default async function handler(req, res) {
     const cleanKey = `${type}_${query || id || date}`.toLowerCase().trim();
     const AHORA = Date.now();
 
-    // Caché de 15 minutos para partidos y 6 horas para equipos
     const TIEMPO_CACHE = type === 'today_matches' ? 15 * 60 * 1000 : 6 * 60 * 60 * 1000;
 
     if (cacheDatos[cleanKey] && Array.isArray(cacheDatos[cleanKey]) && cacheDatos[cleanKey].length > 0 && (AHORA - ultimaActualizacion[cleanKey] < TIEMPO_CACHE)) {
         return res.status(200).json({ origen: 'cache', data: cacheDatos[cleanKey] });
     }
 
-    // Tomar la clave limpia
     const apiKey = (process.env.SPORTAPI_KEY || process.env.API_FOOTBALL_KEY || '').trim();
 
     if (!apiKey) {
@@ -67,14 +65,15 @@ export default async function handler(req, res) {
             json = JSON.parse(rawText);
         } catch (e) {
             return res.status(response.status).json({
-                error: `HTTP ${response.status}: Respuesta no válida`,
+                error: `HTTP ${response.status}: Respuesta no JSON`,
                 detalle: rawText.substring(0, 160)
             });
         }
 
         if (!response.ok) {
             return res.status(response.status).json({
-                error: json.message || `Error HTTP ${response.status} de SportAPI`,
+                error: json.message || json.error || `Error ${response.status}`,
+                urlConsultada: endpointUrl,
                 detalles: json
             });
         }

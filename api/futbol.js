@@ -5,8 +5,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const key = process.env.SPORTAPI_KEY;
-  if (!key) return res.status(500).json({ error: 'Falta SPORTAPI_KEY en Vercel' });
+  const key = process.env.SPORTAPI_API_KEY || process.env.SPORTAPI_KEY;
+  if (!key) return res.status(500).json({ error: 'Falta SPORTAPI_API_KEY en Vercel' });
 
   const { type = 'leagues', slug = '', id = '', league = '', date = '' } = req.query;
 

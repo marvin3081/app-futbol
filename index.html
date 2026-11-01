@@ -3,421 +3,232 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Futbol Tracker</title>
+  <title>Sport Tracker Pro</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 font-sans">
-  <div class="max-w-2xl mx-auto space-y-4">
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 font-sans">
+  <div class="max-w-2xl mx-auto space-y-5">
+    
     <header class="text-center py-3 border-b border-slate-800">
-      <h1 class="text-2xl font-bold text-emerald-400">⚽ App de Fútbol</h1>
-      <p class="text-slate-400 text-sm">Partidos de hoy, competiciones y estadísticas por equipo</p>
+      <h1 class="text-2xl font-black text-emerald-400 tracking-wide">⚡ TRACKER & PRONÓSTICOS</h1>
+      <p class="text-slate-400 text-xs mt-1">Partidos del día, horarios locales y análisis rápido</p>
     </header>
 
-    <!-- Buscar equipo -->
+    <!-- Barra de búsqueda -->
     <div class="flex gap-2">
-      <label for="searchInput" class="sr-only">Equipo</label>
-      <input id="searchInput" type="text" placeholder="Equipo (ej. Arsenal, Manchester City)"
-        class="bg-slate-800 text-white p-3 rounded-lg w-full border border-slate-700 placeholder-slate-500">
-      <button id="btnBuscar" class="bg-emerald-500 hover:bg-emerald-600 px-5 rounded-lg font-bold text-slate-950 disabled:opacity-50">Buscar</button>
-    </div>
-    <p class="text-[11px] text-slate-500">Escribe el nombre en inglés, como aparece en la lista de partidos.</p>
-
-    <!-- Competiciones -->
-    <div class="flex gap-2">
-      <label for="ligaSelect" class="sr-only">Competición</label>
-      <select id="ligaSelect" class="bg-slate-800 text-white p-3 rounded-lg w-full border border-slate-700">
-        <option value="18">UEFA Champions League</option>
-        <option value="24">Premier League</option>
-        <option value="1">Spanish La Liga</option>
-      </select>
-      <button id="btnLiga" class="bg-slate-700 hover:bg-slate-600 px-5 rounded-lg font-bold disabled:opacity-50">Ver</button>
+      <input 
+        id="searchInput" 
+        type="text" 
+        placeholder="Ej: Panamá, Real Madrid, Concacaf..." 
+        class="bg-slate-900 text-white px-4 py-3 rounded-xl w-full border border-slate-800 focus:outline-none focus:border-emerald-500 transition-all text-sm"
+        onkeydown="if(event.key === 'Enter') ejecutarBusqueda()"
+      />
+      <button 
+        id="btnBuscar"
+        onclick="ejecutarBusqueda()" 
+        class="bg-emerald-500 hover:bg-emerald-400 px-6 rounded-xl font-bold text-slate-950 transition-all text-sm shrink-0">
+        Buscar
+      </button>
     </div>
 
-    <div id="status" class="text-xs text-amber-400 text-center min-h-[1rem]"></div>
+    <!-- Atajos Rápidos -->
+    <div class="flex flex-wrap gap-2 text-xs">
+      <button onclick="cargarPartidosDeHoy()" class="bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold px-3 py-1.5 rounded-lg hover:bg-emerald-500/30 transition-all">
+        📅 Partidos de Hoy
+      </button>
+      <button onclick="buscarAtajo('Panama')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">🇵🇦 Panamá</button>
+      <button onclick="buscarAtajo('Concacaf')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">🌎 Concacaf</button>
+      <button onclick="buscarAtajo('Real Madrid')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">⚪ Real Madrid</button>
+    </div>
 
-    <!-- Partidos de hoy -->
-    <section id="vistaHoy" class="space-y-3">
-      <h2 class="text-lg font-semibold text-slate-200">Partidos de hoy</h2>
-      <div id="contenedorHoy"><div class="py-8 text-center text-slate-500">Cargando partidos...</div></div>
-    </section>
+    <!-- Estado -->
+    <div id="status" class="text-xs text-amber-400 text-center font-mono">Toca "Partidos de Hoy" o realiza una búsqueda</div>
 
-    <!-- Detalle de equipo -->
-    <section id="vistaEquipo" class="space-y-3 hidden">
-      <button id="btnVolver" class="text-sm text-emerald-400">← Volver a partidos de hoy</button>
-      <div id="contenedorEquipo"></div>
-    </section>
+    <!-- Contenedor de Resultados -->
+    <div id="contenedorResultados" class="space-y-3"></div>
 
-    <!-- Detalle de competición -->
-    <section id="vistaLiga" class="space-y-3 hidden">
-      <button id="btnVolver2" class="text-sm text-emerald-400">← Volver a partidos de hoy</button>
-      <div id="contenedorLiga"></div>
-    </section>
+    <!-- Modal forma -->
+    <div id="modalStats" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+          <h3 id="modalTitulo" class="font-bold text-emerald-400 text-sm truncate">Forma Reciente</h3>
+          <button onclick="cerrarModal()" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+        </div>
+        <div id="modalContenido" class="space-y-2 text-xs text-slate-300"></div>
+      </div>
+    </div>
+
   </div>
 
   <script>
-    const VERCEL_URL = "";
-    let partidosHoy = [];
-
-    const $ = id => document.getElementById(id);
-
-    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-    const cajaError = msg =>
-      `<div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-center text-red-300 text-xs">${esc(msg)}</div>`;
-
-    function mostrarVista(vista) {
-      $('vistaHoy').classList.toggle('hidden', vista !== 'hoy');
-      $('vistaEquipo').classList.toggle('hidden', vista !== 'equipo');
-      $('vistaLiga').classList.toggle('hidden', vista !== 'liga');
+    function buscarAtajo(termino) {
+      document.getElementById('searchInput').value = termino;
+      ejecutarBusqueda();
     }
 
-    function setStatus(json) {
-      if (!json) { $('status').innerText = ''; return; }
-      $('status').innerText =
-        `Peticiones restantes: ${json.remaining ?? '?'} hoy · ${json.monthRemaining ?? '?'} este mes`;
-    }
+    async function cargarPartidosDeHoy() {
+      const contenedor = document.getElementById('contenedorResultados');
+      const status = document.getElementById('status');
+      
+      status.innerText = "Consultando cartelera de hoy...";
+      contenedor.innerHTML = '<div class="py-12 text-center text-slate-500">Cargando encuentros de la jornada...</div>';
 
-    async function api(params) {
-      const res = await fetch(`${VERCEL_URL}/api/futbol?${new URLSearchParams(params)}`);
-      const texto = await res.text();
-      let json;
-      try { json = JSON.parse(texto); }
-      catch { throw new Error(`Respuesta no válida (HTTP ${res.status})`); }
-      if (!res.ok || json.error) {
-        const e = new Error(json.error || `HTTP ${res.status}`);
-        e.status = res.status;
-        throw e;
-      }
-      return json;
-    }
-
-    function aSlug(texto) {
-      return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    }
-
-    function fechaLocal() {
-      const h = new Date();
-      return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`;
-    }
-
-    function hora(utc) {
-      return utc ? new Date(utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-    }
-
-    function fechaCorta(f) {
-      return f ? String(f).slice(5).replace('-', '/') : '';
-    }
-
-    /* ---------- Partidos de hoy ---------- */
-    async function cargarHoy() {
-      const cont = $('contenedorHoy');
       try {
-        const json = await api({ type: 'day', date: fechaLocal() });
-        setStatus(json);
-        partidosHoy = Array.isArray(json.data) ? json.data : [];
-        if (!partidosHoy.length) {
-          cont.innerHTML = '<div class="py-8 text-center text-slate-500 text-sm">No hay partidos hoy.</div>';
+        const res = await fetch(`/api/futbol?type=today_matches`);
+        const json = await res.json();
+
+        if (json.error) throw new Error(json.error);
+
+        const partidos = Array.isArray(json.data) ? json.data : [];
+
+        if (partidos.length === 0) {
+          status.innerText = "Jornada vacía";
+          contenedor.innerHTML = '<div class="py-8 text-center text-slate-500 text-sm">No hay partidos registrados para hoy en este momento.</div>';
           return;
         }
-        renderHoy(partidosHoy);
+
+        status.innerText = `Origen: ${json.origen === 'cache' ? 'Caché' : 'En vivo'} · ${partidos.length} encuentros hoy`;
+        renderizarPartidosHoy(partidos);
       } catch (err) {
-        cont.innerHTML = cajaError(err.message);
+        status.innerText = "Error";
+        contenedor.innerHTML = `<div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-center text-red-300 text-xs">${err.message}</div>`;
       }
     }
 
-    function renderHoy(partidos) {
-      const grupos = {};
-      partidos.forEach(m => { (grupos[m.league_name || 'Otras'] ||= []).push(m); });
-      const nombres = Object.keys(grupos).sort();
-      const abrirTodo = partidos.length <= 30;
+    function renderizarPartidosHoy(lista) {
+      const contenedor = document.getElementById('contenedorResultados');
+      contenedor.innerHTML = lista.map(p => {
+        const local = p.home_team?.name || p.home_team || 'Local';
+        const visita = p.away_team?.name || p.away_team || 'Visita';
+        const torneo = p.competition?.name || p.league?.name || 'Competición';
+        const estado = p.status || 'Programado';
 
-      $('contenedorHoy').innerHTML = nombres.map(liga => {
-        const lista = grupos[liga].sort((a, b) =>
-          String(a.kickoff_utc).localeCompare(String(b.kickoff_utc)));
-        const hayVivo = lista.some(m => m.status === 'LIVE');
+        let horaTexto = '--:--';
+        if (p.kickoff_utc || p.date) {
+          const fechaObj = new Date(p.kickoff_utc || p.date);
+          horaTexto = fechaObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        const marcador = (p.home_score !== undefined && p.home_score !== null)
+          ? `${p.home_score} - ${p.away_score}`
+          : horaTexto;
+
         return `
-          <details class="bg-slate-800/60 rounded-xl border border-slate-700/50 mb-2" ${abrirTodo || hayVivo ? 'open' : ''}>
-            <summary class="p-3 cursor-pointer text-sm font-semibold text-slate-200">
-              ${esc(liga)} <span class="text-slate-500 font-normal">(${lista.length})</span>
-              ${hayVivo ? '<span class="ml-1 text-red-400 text-xs">● en vivo</span>' : ''}
-            </summary>
-            <div class="px-3 pb-2 divide-y divide-slate-800">${lista.map(filaPartido).join('')}</div>
-          </details>`;
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 space-y-2 hover:border-slate-700 transition-all">
+            <div class="flex justify-between items-center text-[11px] text-slate-500 border-b border-slate-800/60 pb-1.5">
+              <span class="truncate font-medium text-emerald-400/80">${torneo}</span>
+              <span class="px-2 py-0.5 rounded bg-slate-950 text-slate-400 font-mono">${estado}</span>
+            </div>
+            <div class="flex justify-between items-center text-sm pt-0.5">
+              <span class="font-semibold text-slate-200 truncate flex-1">${local}</span>
+              <span class="font-bold text-white px-3 font-mono bg-slate-950 py-1 rounded-lg border border-slate-800 text-xs shrink-0">${marcador}</span>
+              <span class="font-semibold text-slate-200 truncate flex-1 text-right">${visita}</span>
+            </div>
+          </div>
+        `;
       }).join('');
     }
 
-    function filaPartido(m) {
-      let estado, centro;
-      if (m.status === 'LIVE') {
-        estado = `<span class="text-red-400">${esc(m.minute || 'VIVO')}</span>`;
-        centro = `${esc(m.home_score ?? 0)} - ${esc(m.away_score ?? 0)}`;
-      } else if (['FT', 'AET', 'PENS'].includes(m.status)) {
-        estado = esc(m.status);
-        centro = `${esc(m.home_score)} - ${esc(m.away_score)}`;
-      } else if (m.status === 'Scheduled') {
-        estado = esc(hora(m.kickoff_utc));
-        centro = 'vs';
-      } else {
-        estado = esc(m.status);
-        centro = 'vs';
-      }
-      return `
-        <div class="flex items-center gap-2 py-2 text-sm">
-          <span class="w-12 text-xs text-slate-400">${estado}</span>
-          <button class="team-link flex-1 text-right truncate hover:text-emerald-400" data-id="${esc(m.home_id)}" data-name="${esc(m.home_team)}">${esc(m.home_team)}</button>
-          <span class="font-bold w-12 text-center">${centro}</span>
-          <button class="team-link flex-1 text-left truncate hover:text-emerald-400" data-id="${esc(m.away_id)}" data-name="${esc(m.away_team)}">${esc(m.away_team)}</button>
-        </div>`;
-    }
+    async function ejecutarBusqueda() {
+      const query = document.getElementById('searchInput').value.trim();
+      const contenedor = document.getElementById('contenedorResultados');
+      const status = document.getElementById('status');
+      const btn = document.getElementById('btnBuscar');
 
-    /* ---------- Búsqueda de equipo ---------- */
-    async function buscarEquipo(query, id) {
-      const cont = $('contenedorEquipo');
-      const btn = $('btnBuscar');
-      mostrarVista('equipo');
+      if (!query) return;
+
       btn.disabled = true;
-      cont.innerHTML = '<div class="py-12 text-center text-slate-500">Buscando equipo...</div>';
+      status.innerText = "Buscando...";
+      contenedor.innerHTML = '<div class="py-12 text-center text-slate-500">Cargando resultados...</div>';
 
       try {
-        let data, porId = false;
+        const res = await fetch(`/api/futbol?type=search&query=${encodeURIComponent(query)}`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
 
-        if (id) {
-          data = await api({ type: 'team_id', id });
-          porId = true;
-        } else {
-          try {
-            data = await api({ type: 'team', slug: aSlug(query) });
-          } catch (e) {
-            if (e.status !== 404) throw e;
-            // Plan B: buscar entre los equipos de los partidos de hoy
-            const q = aSlug(query);
-            const hit = partidosHoy.find(m => aSlug(m.home_team).includes(q))
-                     || partidosHoy.find(m => aSlug(m.away_team).includes(q));
-            if (!hit) {
-              cont.innerHTML = `<div class="py-8 text-center text-slate-400 text-sm">No encontré "${esc(query)}". Prueba el nombre en inglés o toca un equipo de la lista.</div>`;
-              return;
-            }
-            const eq = aSlug(hit.home_team).includes(q) ? hit.home_id : hit.away_id;
-            data = await api({ type: 'team_id', id: eq });
-            porId = true;
-          }
-        }
-        setStatus(data);
-
-        const team = data.team;
-        let proximos, resultados, ligaId;
-
-        if (porId) {
-          const todos = Array.isArray(data.matches) ? data.matches : [];
-          proximos = todos.filter(m => m.status === 'Scheduled')
-            .sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(0, 5);
-          resultados = todos.filter(m => ['FT', 'AET', 'PENS'].includes(m.status))
-            .sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 5);
-          ligaId = team.league_id ?? data.leagues?.[0]?.id;
-        } else {
-          proximos = (data.upcoming || []).slice(0, 5);
-          resultados = (data.results || []).slice(0, 5);
-          ligaId = team.league?.id;
+        const items = Array.isArray(json.data) ? json.data : [];
+        if (items.length === 0) {
+          contenedor.innerHTML = '<div class="py-8 text-center text-slate-500 text-sm">Sin coincidencias.</div>';
+          return;
         }
 
-        // Posición en la tabla
-        let fila = null;
-        if (ligaId) {
-          try {
-            const st = await api({ type: 'standings', league: ligaId });
-            setStatus(st);
-            const planas = (st.data || []).flatMap(r => r.table ? r.table : [r]);
-            fila = planas.find(r => r.team?.id === team.id) || null;
-          } catch (e) { /* si falla, se muestra sin tabla */ }
-        }
-
-        renderEquipo(team, fila, proximos, resultados);
+        status.innerText = `${items.length} resultados (${json.origen === 'cache' ? 'Caché' : 'En vivo'})`;
+        renderizarLista(items);
       } catch (err) {
-        cont.innerHTML = cajaError(err.message);
+        contenedor.innerHTML = `<div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-center text-red-300 text-xs">${err.message}</div>`;
       } finally {
         btn.disabled = false;
       }
     }
 
-    function chipForma(r) {
-      const color = r === 'W' ? 'bg-emerald-500' : r === 'L' ? 'bg-red-500' : 'bg-amber-500';
-      return `<span class="inline-block w-6 h-6 leading-6 text-center text-xs font-bold text-slate-950 rounded ${color}">${esc(r)}</span>`;
-    }
+    function renderizarLista(lista) {
+      const contenedor = document.getElementById('contenedorResultados');
+      contenedor.innerHTML = lista.map(item => {
+        const id = item.id || item.team?.id || '';
+        const nombre = item.name || item.team?.name || 'Sin nombre';
+        const pais = item.country?.name || item.country || 'Internacional';
+        const logo = item.logo || item.team?.logo || 'https://via.placeholder.com/64?text=⚽';
 
-    function celda(etiqueta, valor) {
-      return `<div class="bg-slate-900/60 rounded-lg p-2 text-center">
-        <div class="text-lg font-bold">${esc(valor)}</div>
-        <div class="text-[11px] text-slate-400">${etiqueta}</div></div>`;
-    }
-
-    function lineaPartido(m) {
-      const marcador = m.home_score != null ? `${esc(m.home_score)} - ${esc(m.away_score)}` : 'vs';
-      return `
-        <div class="flex items-center gap-2 py-2 text-sm">
-          <span class="w-12 text-xs text-slate-400">${esc(fechaCorta(m.date))}</span>
-          <span class="flex-1 text-right truncate">${esc(m.home_team)}</span>
-          <span class="font-bold w-12 text-center">${marcador}</span>
-          <span class="flex-1 text-left truncate">${esc(m.away_team)}</span>
-        </div>`;
-    }
-
-    function renderEquipo(team, fila, proximos, resultados) {
-      const liga = team.league?.name || '';
-      const info = [team.city, team.stadium_name, team.coach_name ? `DT: ${team.coach_name}` : '']
-        .filter(Boolean).map(esc).join(' · ');
-
-      let bloqueTabla = '<p class="text-sm text-slate-500">No encontré la posición en la tabla.</p>';
-      if (fila) {
-        bloqueTabla = `
-          <div class="grid grid-cols-4 gap-2">
-            ${celda('Posición', fila.position + '°')}
-            ${celda('Puntos', fila.points)}
-            ${celda('PJ', fila.played)}
-            ${celda('DG', fila.goal_difference)}
-            ${celda('G', fila.won)}
-            ${celda('E', fila.draw)}
-            ${celda('P', fila.lost)}
-            ${celda('GF/GC', fila.goals_for + '/' + fila.goals_against)}
+        return `
+          <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3 flex items-center justify-between hover:border-slate-700">
+            <div class="flex items-center gap-3 min-w-0">
+              <img src="${logo}" class="w-9 h-9 object-contain bg-slate-950 rounded p-1" onerror="this.src='https://via.placeholder.com/64?text=⚽'"/>
+              <div class="truncate">
+                <h4 class="font-bold text-sm text-white truncate">${nombre}</h4>
+                <p class="text-xs text-emerald-400 truncate">${pais}</p>
+              </div>
+            </div>
+            ${id ? `
+              <button onclick="verPartidos('${id}', '${nombre.replace(/'/g, "\\'")}')" class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                📊 Forma
+              </button>
+            ` : ''}
           </div>
-          ${Array.isArray(fila.form) && fila.form.length
-            ? `<div class="flex items-center gap-1 mt-3"><span class="text-xs text-slate-400 mr-1">Forma:</span>${fila.form.map(f => chipForma(f.result)).join('')}</div>`
-            : ''}`;
-      }
-
-      $('contenedorEquipo').innerHTML = `
-        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 space-y-1">
-          <h2 class="text-xl font-bold text-emerald-400">${esc(team.name)}</h2>
-          ${liga ? `<p class="text-sm text-slate-300">${esc(liga)}</p>` : ''}
-          ${info ? `<p class="text-xs text-slate-500">${info}</p>` : ''}
-        </div>
-        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
-          <h3 class="text-sm font-semibold text-slate-200 mb-3">Posición y estadísticas</h3>
-          ${bloqueTabla}
-        </div>
-        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
-          <h3 class="text-sm font-semibold text-slate-200 mb-1">Próximos partidos</h3>
-          <div class="divide-y divide-slate-800">${proximos.length ? proximos.map(lineaPartido).join('') : '<p class="text-sm text-slate-500 py-2">Sin partidos próximos.</p>'}</div>
-        </div>
-        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
-          <h3 class="text-sm font-semibold text-slate-200 mb-1">Últimos resultados</h3>
-          <div class="divide-y divide-slate-800">${resultados.length ? resultados.map(lineaPartido).join('') : '<p class="text-sm text-slate-500 py-2">Sin resultados recientes.</p>'}</div>
-        </div>`;
+        `;
+      }).join('');
     }
 
-    /* ---------- Competiciones ---------- */
-    async function cargarLigas() {
+    async function verPartidos(id, nombre) {
+      const modal = document.getElementById('modalStats');
+      const titulo = document.getElementById('modalTitulo');
+      const contenido = document.getElementById('modalContenido');
+
+      titulo.innerText = `Últimos partidos: ${nombre}`;
+      contenido.innerHTML = '<div class="py-4 text-center text-slate-500">Cargando...</div>';
+      modal.classList.remove('hidden');
+
       try {
-        const json = await api({ type: 'leagues' });
-        const sel = $('ligaSelect');
-        const html = (json.data || []).map(p => {
-          const ligas = (p.leagues || []).filter(l => l.has_standings);
-          if (!ligas.length) return '';
-          return `<optgroup label="${esc(p.country)}">${ligas.map(l =>
-            `<option value="${esc(l.id)}">${esc(l.name)}</option>`).join('')}</optgroup>`;
-        }).join('');
-        if (html) {
-          sel.innerHTML = html;
-          if (![...sel.options].some(o => o.value === '18')) {
-            sel.insertAdjacentHTML('afterbegin', '<option value="18">UEFA Champions League</option>');
-          }
-          sel.value = '18';
+        const res = await fetch(`/api/futbol?type=matches&id=${id}`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+
+        const matches = Array.isArray(json.data) ? json.data : [];
+        if (matches.length === 0) {
+          contenido.innerHTML = '<div class="py-2 text-center text-slate-500">Sin datos recientes.</div>';
+          return;
         }
-      } catch (e) { /* se queda con la lista básica */ }
-    }
 
-    async function verLiga() {
-      const sel = $('ligaSelect');
-      const id = sel.value;
-      const nombre = sel.selectedOptions[0]?.textContent || 'Competición';
-      const cont = $('contenedorLiga');
-      mostrarVista('liga');
-      $('btnLiga').disabled = true;
-      cont.innerHTML = '<div class="py-12 text-center text-slate-500">Cargando competición...</div>';
-      try {
-        const [st, det] = await Promise.all([
-          api({ type: 'standings', league: id }),
-          api({ type: 'league', id }).catch(() => null)
-        ]);
-        setStatus(st);
-        renderLiga(id, nombre, st.data || [], det);
+        contenido.innerHTML = matches.map(m => {
+          const l = m.home_team?.name || m.home_team || 'Local';
+          const v = m.away_team?.name || m.away_team || 'Visita';
+          const gL = m.home_score !== undefined ? m.home_score : '-';
+          const gV = m.away_score !== undefined ? m.away_score : '-';
+          return `
+            <div class="flex justify-between items-center p-2 rounded bg-slate-950 border border-slate-800">
+              <span class="truncate flex-1">${l}</span>
+              <span class="font-bold text-white px-2 font-mono">${gL} - ${gV}</span>
+              <span class="truncate flex-1 text-right">${v}</span>
+            </div>
+          `;
+        }).join('');
       } catch (err) {
-        cont.innerHTML = cajaError(err.message);
-      } finally {
-        $('btnLiga').disabled = false;
+        contenido.innerHTML = `<div class="text-red-400 text-center py-2">${err.message}</div>`;
       }
     }
 
-    function filaTabla(r, id, total) {
-      const pos = r.position;
-      let color = 'text-slate-400';
-      if (id === '18' && total >= 30) color = pos <= 8 ? 'text-emerald-400' : pos <= 24 ? 'text-amber-400' : 'text-red-400';
-      else if (pos <= 4) color = 'text-emerald-400';
-      return `<tr class="hover:bg-slate-800/80">
-        <td class="py-2 font-bold ${color}">${esc(pos)}</td>
-        <td class="py-2"><button class="team-link text-left hover:text-emerald-400" data-id="${esc(r.team?.id)}" data-name="${esc(r.team?.name)}">${esc(r.team?.name)}</button></td>
-        <td class="py-2 text-center text-slate-400">${esc(r.played)}</td>
-        <td class="py-2 text-center text-slate-400">${esc(r.goal_difference)}</td>
-        <td class="py-2 text-center font-bold">${esc(r.points)}</td></tr>`;
+    function cerrarModal() {
+      document.getElementById('modalStats').classList.add('hidden');
     }
-
-    function renderLiga(id, nombre, filas, det) {
-      const grupos = filas[0]?.table ? filas : [{ group: '', table: filas }];
-      const total = grupos.reduce((n, g) => n + g.table.length, 0);
-
-      const tablas = total ? grupos.map(g => `
-        ${g.group ? `<h4 class="text-xs font-semibold text-slate-400 mt-3 mb-1">${esc(g.group)}</h4>` : ''}
-        <table class="w-full text-left text-sm">
-          <thead class="text-slate-400 border-b border-slate-700 text-xs">
-            <tr><th class="pb-1">#</th><th class="pb-1">Equipo</th><th class="pb-1 text-center">PJ</th><th class="pb-1 text-center">DG</th><th class="pb-1 text-center">Pts</th></tr>
-          </thead>
-          <tbody class="divide-y divide-slate-800">${g.table.map(r => filaTabla(r, id, total)).join('')}</tbody>
-        </table>`).join('')
-        : '<p class="text-sm text-slate-500 py-2">Esta competición no tiene tabla disponible.</p>';
-
-      const leyenda = (id === '18' && total >= 30)
-        ? '<p class="text-[11px] text-slate-500 mt-2"><span class="text-emerald-400">●</span> 1-8 octavos · <span class="text-amber-400">●</span> 9-24 playoff · <span class="text-red-400">●</span> eliminados</p>'
-        : '';
-
-      const prox = (det?.upcoming_fixtures || []).slice(0, 6);
-      const rec = (det?.recent_results || []).slice(0, 6);
-
-      $('contenedorLiga').innerHTML = `
-        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 overflow-x-auto">
-          <h2 class="text-lg font-bold text-emerald-400 mb-2">${esc(nombre)}</h2>
-          ${tablas}${leyenda}
-        </div>
-        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
-          <h3 class="text-sm font-semibold text-slate-200 mb-1">Próximos partidos</h3>
-          <div class="divide-y divide-slate-800">${prox.length ? prox.map(lineaPartido).join('') : '<p class="text-sm text-slate-500 py-2">Sin partidos próximos.</p>'}</div>
-        </div>
-        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
-          <h3 class="text-sm font-semibold text-slate-200 mb-1">Últimos resultados</h3>
-          <div class="divide-y divide-slate-800">${rec.length ? rec.map(lineaPartido).join('') : '<p class="text-sm text-slate-500 py-2">Sin resultados recientes.</p>'}</div>
-        </div>`;
-    }
-
-    /* ---------- Eventos ---------- */
-    function lanzarBusqueda() {
-      const q = $('searchInput').value.trim();
-      if (q) buscarEquipo(q);
-    }
-
-    $('btnBuscar').addEventListener('click', lanzarBusqueda);
-    $('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') lanzarBusqueda(); });
-    $('btnLiga').addEventListener('click', verLiga);
-    $('btnVolver').addEventListener('click', () => mostrarVista('hoy'));
-    $('btnVolver2').addEventListener('click', () => mostrarVista('hoy'));
-    document.addEventListener('click', e => {
-      const b = e.target.closest('.team-link');
-      if (!b) return;
-      $('searchInput').value = b.dataset.name;
-      buscarEquipo(b.dataset.name, b.dataset.id);
-    });
-
-    cargarHoy();
-    cargarLigas();
   </script>
 </body>
 </html>

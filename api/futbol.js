@@ -1,62 +1,41 @@
-const BASE = 'https://sportapi.ai/api';
-
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
-  const key = process.env.SPORTAPI_API_KEY || process.env.SPORTAPI_KEY;
-  if (!key) return res.status(500).json({ error: 'Falta SPORTAPI_API_KEY en Vercel' });
+    if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { type = 'leagues', slug = '', id = '', league = '', date = '' } = req.query;
+    const apiKey = process.env.SPORTAPI_KEY || process.env.API_FOOTBALL_KEY || '';
 
-  const okSlug = /^[a-z0-9-]+$/;
-  let path, ttl;
-
-  if (type === 'leagues') {
-    path = '/leagues'; ttl = 86400;
-  } else if (type === 'league') {
-    if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'id inválido' });
-    path = `/leagues/${id}`; ttl = 21600;
-  } else if (type === 'standings') {
-    if (!okSlug.test(league)) return res.status(400).json({ error: 'league inválida' });
-    path = `/standings/${league}`; ttl = 21600;
-  } else if (type === 'team') {
-    if (!okSlug.test(slug)) return res.status(400).json({ error: 'slug inválido' });
-    path = `/teams/slug/${slug}`; ttl = 3600;
-  } else if (type === 'team_id') {
-    if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'id inválido' });
-    path = `/teams/${id}`; ttl = 3600;
-  } else if (type === 'day') {
-    const f = date || new Date().toISOString().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return res.status(400).json({ error: 'fecha inválida' });
-    path = `/fixtures/date/${f}`; ttl = 900;
-  } else {
-    return res.status(400).json({ error: 'Tipo no soportado' });
-  }
-
-  try {
-    const r = await fetch(BASE + path, {
-      headers: { 'X-Api-Key': key, 'Accept': 'application/json' }
-    });
-    const texto = await r.text();
-    let json;
-    try { json = JSON.parse(texto); } catch { json = null; }
-
-    const remaining = r.headers.get('x-ratelimit-remaining');
-    const monthRemaining = r.headers.get('x-ratelimit-month-remaining');
-
-    if (!r.ok || !json || json.success === false) {
-      // Sin Cache-Control: los errores no se guardan en caché
-      return res.status(r.status === 200 ? 502 : r.status).json({
-        error: json?.error || `SportAPI respondió ${r.status}`,
-        path, remaining, monthRemaining
-      });
+    if (!apiKey) {
+        return res.status(500).json({ error: 'No se encontró la variable SPORTAPI_KEY ni API_FOOTBALL_KEY en Vercel.' });
     }
 
-    res.setHeader('Cache-Control', `s-maxage=${ttl}, stale-while-revalidate=600`);
-    return res.status(200).json({ ...json, remaining, monthRemaining });
-  } catch (e) {
-    return res.status(500).json({ error: 'Error de conexión', details: e.message });
-  }
+    // Ruta de prueba base para validar conexión y credenciales
+    const testUrl = 'https://sportapi.ai/api/v1/football/fixtures/date/' + new Date().toISOString().split('T')[0];
+
+    try {
+        const response = await fetch('https://sportapi.ai/api/v1/status', {
+            method: 'GET',
+            headers: {
+                'X-Api-Key': apiKey,
+                'Accept': 'application/json'
+            }
+        });
+
+        const statusText = await response.text();
+        let parsed = null;
+        try { parsed = JSON.parse(statusText); } catch(e) {}
+
+        return res.status(200).json({
+            mensaje: 'Prueba de conexión con SportAPI',
+            http_status_sportapi: response.status,
+            ok: response.ok,
+            respuesta_sportapi: parsed || statusText
+        });
+    } catch (error) {
+        return res.status(500).json({
+            error: 'Fallo al intentar contactar a SportAPI',
+            detalle: error.message
+        });
+    }
 }

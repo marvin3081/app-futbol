@@ -3,111 +3,236 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Futbol Tracker</title>
+  <title>Sport Tracker Pro</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 font-sans">
-  <div class="max-w-2xl mx-auto space-y-6">
-    <header class="text-center py-4 border-b border-slate-800">
-      <h1 class="text-2xl font-bold text-emerald-400">⚽ App de Fútbol</h1>
-      <p class="text-slate-400 text-sm">Tablas de posiciones</p>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 font-sans">
+  <div class="max-w-2xl mx-auto space-y-5">
+    
+    <header class="text-center py-3 border-b border-slate-800">
+      <h1 class="text-2xl font-black text-emerald-400 tracking-wide">⚡ TRACKER & PRONÓSTICOS</h1>
+      <p class="text-slate-400 text-xs mt-1">Partidos del día, horarios y análisis rápido</p>
     </header>
 
-    <!-- Selector de Liga -->
+    <!-- Barra de búsqueda -->
     <div class="flex gap-2">
-      <label for="leagueSelect" class="sr-only">Liga</label>
-      <select id="leagueSelect" class="bg-slate-800 text-white p-3 rounded-lg w-full border border-slate-700">
-        <option value="261">LPF Panamá</option>
-        <option value="140">LaLiga (España)</option>
-        <option value="39">Premier League (Inglaterra)</option>
-        <option value="135">Serie A (Italia)</option>
-        <option value="78">Bundesliga (Alemania)</option>
-        <option value="61">Ligue 1 (Francia)</option>
-        <option value="262">Liga MX (México)</option>
-        <option value="253">MLS (EE. UU.)</option>
-        <option value="71">Brasileirão (Brasil)</option>
-        <option value="128">Liga Profesional (Argentina)</option>
-        <option value="2">UEFA Champions League</option>
-        <option value="3">UEFA Europa League</option>
-        <option value="13">Copa Libertadores</option>
-      </select>
-      <button id="btnCargar" class="bg-emerald-500 hover:bg-emerald-600 px-5 rounded-lg font-bold text-slate-950">
-        Cargar
+      <input 
+        id="searchInput" 
+        type="text" 
+        placeholder="Ej: Panamá, Real Madrid, Concacaf..." 
+        class="bg-slate-900 text-white px-4 py-3 rounded-xl w-full border border-slate-800 focus:outline-none focus:border-emerald-500 transition-all text-sm"
+        onkeydown="if(event.key === 'Enter') ejecutarBusqueda()"
+      />
+      <button 
+        id="btnBuscar"
+        onclick="ejecutarBusqueda()" 
+        class="bg-emerald-500 hover:bg-emerald-400 px-6 rounded-xl font-bold text-slate-950 transition-all text-sm shrink-0">
+        Buscar
       </button>
     </div>
 
-    <!-- Indicador de Estado -->
-    <div id="status" class="text-xs text-amber-400 text-center"></div>
-
-    <!-- Contenedor Tabla -->
-    <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 shadow-xl overflow-x-auto">
-      <h2 class="text-lg font-semibold mb-3 text-slate-200">Tabla de Posiciones</h2>
-      <table class="w-full text-left text-sm">
-        <thead class="text-slate-400 border-b border-slate-700">
-          <tr>
-            <th class="pb-2">#</th>
-            <th class="pb-2">Equipo</th>
-            <th class="pb-2 text-center">PJ</th>
-            <th class="pb-2 text-center">Pts</th>
-          </tr>
-        </thead>
-        <tbody id="tablaBody" class="divide-y divide-slate-800">
-          <tr><td colspan="4" class="py-4 text-center text-slate-500">Selecciona una liga...</td></tr>
-        </tbody>
-      </table>
+    <!-- Atajos Rápidos -->
+    <div class="flex flex-wrap gap-2 text-xs">
+      <button onclick="cargarPartidosDeHoy()" class="bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold px-3 py-1.5 rounded-lg hover:bg-emerald-500/30 transition-all">
+        📅 Partidos de Hoy
+      </button>
+      <button onclick="buscarAtajo('Panama')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">🇵🇦 Panamá</button>
+      <button onclick="buscarAtajo('Concacaf')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">🌎 Concacaf</button>
+      <button onclick="buscarAtajo('Real Madrid')" class="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg hover:border-emerald-500/50 text-slate-300">⚪ Real Madrid</button>
     </div>
+
+    <!-- Estado -->
+    <div id="status" class="text-xs text-amber-400 text-center font-mono">Toca "Partidos de Hoy" o realiza una búsqueda</div>
+
+    <!-- Contenedor -->
+    <div id="contenedorResultados" class="space-y-3"></div>
+
+    <!-- Modal forma -->
+    <div id="modalStats" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+          <h3 id="modalTitulo" class="font-bold text-emerald-400 text-sm truncate">Forma Reciente</h3>
+          <button onclick="cerrarModal()" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+        </div>
+        <div id="modalContenido" class="space-y-2 text-xs text-slate-300"></div>
+      </div>
+    </div>
+
   </div>
 
   <script>
     const VERCEL_URL = "";
 
-    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    function buscarAtajo(termino) {
+      document.getElementById('searchInput').value = termino;
+      ejecutarBusqueda();
+    }
 
-    async function cargarTabla() {
-      const leagueId = document.getElementById('leagueSelect').value;
-      const tbody = document.getElementById('tablaBody');
+    async function cargarPartidosDeHoy() {
+      const contenedor = document.getElementById('contenedorResultados');
       const status = document.getElementById('status');
-      tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-slate-400">Cargando datos...</td></tr>';
+      
+      status.innerText = "Consultando cartelera de hoy...";
+      contenedor.innerHTML = '<div class="py-12 text-center text-slate-500">Cargando encuentros de la jornada...</div>';
 
       try {
-        const res = await fetch(`${VERCEL_URL}/api/futbol?type=standings&league=${leagueId}`);
+        const res = await fetch(`${VERCEL_URL}/api/futbol?type=today_matches`);
         const json = await res.json();
 
         if (json.error) throw new Error(json.error);
 
-        const standings = json.data?.[0]?.league?.standings?.[0];
-        if (!standings?.length) {
-          const e = json.errors && Object.values(json.errors)[0];
-          throw new Error(e || "No hay datos de tabla para esta liga.");
+        const partidos = Array.isArray(json.data) ? json.data : [];
+
+        if (partidos.length === 0) {
+          status.innerText = "Jornada vacía";
+          contenedor.innerHTML = '<div class="py-8 text-center text-slate-500 text-sm">No hay partidos registrados para hoy en este momento.</div>';
+          return;
         }
 
-        status.innerText = `Temporada ${json.season} · Llamadas restantes hoy: ${json.remaining ?? '?'}`;
-        renderizarTabla(standings);
+        status.innerText = `Origen: ${json.origen === 'cache' ? 'Caché (sin gastar cuota)' : 'En vivo'} · ${partidos.length} encuentros hoy`;
+        renderizarPartidosHoy(partidos);
       } catch (err) {
-        status.innerText = "";
-        tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-400">${esc(err.message)}</td></tr>`;
+        status.innerText = "Error";
+        contenedor.innerHTML = `<div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-center text-red-300 text-xs">${err.message}</div>`;
       }
     }
 
-    function renderizarTabla(filas) {
-      const tbody = document.getElementById('tablaBody');
-      tbody.innerHTML = filas.map(item => `
-        <tr class="hover:bg-slate-800/80">
-          <td class="py-3 font-bold ${item.rank <= 3 ? 'text-emerald-400' : 'text-slate-400'}">${esc(item.rank)}</td>
-          <td class="py-3 flex items-center gap-2">
-            <img src="${esc(item.team.logo)}" class="w-5 h-5 object-contain" alt="" onerror="this.style.visibility='hidden'">
-            <span>${esc(item.team.name)}</span>
-          </td>
-          <td class="py-3 text-center text-slate-400">${esc(item.all.played)}</td>
-          <td class="py-3 text-center font-bold text-slate-100">${esc(item.points)}</td>
-        </tr>
-      `).join('');
+    function renderizarPartidosHoy(lista) {
+      const contenedor = document.getElementById('contenedorResultados');
+      contenedor.innerHTML = lista.map(p => {
+        const local = p.home_team?.name || 'Local';
+        const visita = p.away_team?.name || 'Visita';
+        const torneo = p.competition?.name || p.league?.name || 'Competición';
+        const estado = p.status || 'Programado';
+
+        // Convertir la fecha UTC al horario local
+        let horaTexto = '--:--';
+        if (p.kickoff_utc || p.date) {
+          const fechaObj = new Date(p.kickoff_utc || p.date);
+          horaTexto = fechaObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        const marcador = (p.home_score !== undefined && p.home_score !== null)
+          ? `${p.home_score} - ${p.away_score}`
+          : horaTexto;
+
+        return `
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 space-y-2 hover:border-slate-700 transition-all">
+            <div class="flex justify-between items-center text-[11px] text-slate-500 border-b border-slate-800/60 pb-1.5">
+              <span class="truncate font-medium text-emerald-400/80">${torneo}</span>
+              <span class="px-2 py-0.5 rounded bg-slate-950 text-slate-400 font-mono">${estado}</span>
+            </div>
+            <div class="flex justify-between items-center text-sm pt-0.5">
+              <span class="font-semibold text-slate-200 truncate flex-1">${local}</span>
+              <span class="font-bold text-white px-3 font-mono bg-slate-950 py-1 rounded-lg border border-slate-800 text-xs shrink-0">${marcador}</span>
+              <span class="font-semibold text-slate-200 truncate flex-1 text-right">${visita}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
-    document.getElementById('leagueSelect').addEventListener('change', cargarTabla);
-    document.getElementById('btnCargar').addEventListener('click', cargarTabla);
-    cargarTabla();
+    async function ejecutarBusqueda() {
+      const query = document.getElementById('searchInput').value.trim();
+      const contenedor = document.getElementById('contenedorResultados');
+      const status = document.getElementById('status');
+      const btn = document.getElementById('btnBuscar');
+
+      if (!query) return;
+
+      btn.disabled = true;
+      status.innerText = "Buscando...";
+      contenedor.innerHTML = '<div class="py-12 text-center text-slate-500">Cargando resultados...</div>';
+
+      try {
+        const res = await fetch(`${VERCEL_URL}/api/futbol?type=search&query=${encodeURIComponent(query)}`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+
+        const items = Array.isArray(json.data) ? json.data : [];
+        if (items.length === 0) {
+          contenedor.innerHTML = '<div class="py-8 text-center text-slate-500 text-sm">Sin coincidencias.</div>';
+          return;
+        }
+
+        status.innerText = `${items.length} resultados (${json.origen === 'cache' ? 'Caché' : 'En vivo'})`;
+        renderizarLista(items);
+      } catch (err) {
+        contenedor.innerHTML = `<div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-center text-red-300 text-xs">${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function renderizarLista(lista) {
+      const contenedor = document.getElementById('contenedorResultados');
+      contenedor.innerHTML = lista.map(item => {
+        const id = item.id || item.team?.id || '';
+        const nombre = item.name || item.team?.name || 'Sin nombre';
+        const pais = item.country?.name || item.country || 'Internacional';
+        const logo = item.logo || item.team?.logo || 'https://via.placeholder.com/64?text=⚽';
+
+        return `
+          <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3 flex items-center justify-between hover:border-slate-700">
+            <div class="flex items-center gap-3 min-w-0">
+              <img src="${logo}" class="w-9 h-9 object-contain bg-slate-950 rounded p-1" onerror="this.src='https://via.placeholder.com/64?text=⚽'"/>
+              <div class="truncate">
+                <h4 class="font-bold text-sm text-white truncate">${nombre}</h4>
+                <p class="text-xs text-emerald-400 truncate">${pais}</p>
+              </div>
+            </div>
+            ${id ? `
+              <button onclick="verPartidos('${id}', '${nombre.replace(/'/g, "\\'")}')" class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                📊 Forma
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function verPartidos(id, nombre) {
+      const modal = document.getElementById('modalStats');
+      const titulo = document.getElementById('modalTitulo');
+      const contenido = document.getElementById('modalContenido');
+
+      titulo.innerText = `Últimos partidos: ${nombre}`;
+      contenido.innerHTML = '<div class="py-4 text-center text-slate-500">Cargando...</div>';
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`${VERCEL_URL}/api/futbol?type=matches&id=${id}`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+
+        const matches = Array.isArray(json.data) ? json.data : [];
+        if (matches.length === 0) {
+          contenido.innerHTML = '<div class="py-2 text-center text-slate-500">Sin datos recientes.</div>';
+          return;
+        }
+
+        contenido.innerHTML = matches.map(m => {
+          const l = m.home_team?.name || 'Local';
+          const v = m.away_team?.name || 'Visita';
+          const gL = m.home_score !== undefined ? m.home_score : '-';
+          const gV = m.away_score !== undefined ? m.away_score : '-';
+          return `
+            <div class="flex justify-between items-center p-2 rounded bg-slate-950 border border-slate-800">
+              <span class="truncate flex-1">${l}</span>
+              <span class="font-bold text-white px-2 font-mono">${gL} - ${gV}</span>
+              <span class="truncate flex-1 text-right">${v}</span>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        contenido.innerHTML = `<div class="text-red-400 text-center py-2">${err.message}</div>`;
+      }
+    }
+
+    function cerrarModal() {
+      document.getElementById('modalStats').classList.add('hidden');
+    }
   </script>
 </body>
 </html>
+

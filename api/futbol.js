@@ -1,62 +1,61 @@
-const SEASONS = { '261': 2026, '140': 2025, '39': 2025, '2': 2025 };
+let cacheDatos = {};
+let ultimaActualizacion = {};
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
-  const { type = 'standings', league = '261', team } = req.query;
+    if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (!process.env.API_FOOTBALL_KEY) {
-    return res.status(500).json({ error: 'Falta API_FOOTBALL_KEY en Vercel' });
-  }
-  if (
-    !/^\d+$/.test(league) ||
-    (team && !/^\d+$/.test(team)) ||
-    (req.query.season && !/^\d{4}$/.test(req.query.season))
-  ) {
-    return res.status(400).json({ error: 'Parámetros inválidos' });
-  }
-  if (type !== 'standings' && type !== 'next_matches') {
-    return res.status(400).json({ error: 'Tipo de consulta no válido' });
-  }
-  if (type === 'next_matches' && !team) {
-    return res.status(400).json({ error: 'Falta team' });
-  }
+    const { type = 'search', query = '', id = '', date = '' } = req.query;
+    const cleanKey = `${type}_${query || id || date}`.toLowerCase().trim();
+    const AHORA = Date.now();
 
-  const first = Number(req.query.season || SEASONS[league] || 2025);
-  const candidates = type === 'standings' ? [first, first - 1] : [null];
-  let lastErrors = null;
-  let remaining = null;
+    // Caché: 15 minutos para partidos de hoy, 6 horas para búsquedas
+    const TIEMPO_CACHE = type === 'today_matches' ? 15 * 60 * 1000 : (type === 'search' ? 6 * 60 * 60 * 1000 : 30 * 60 * 1000);
 
-  try {
-    for (const season of candidates) {
-      const apiUrl =
-        type === 'standings'
-          ? `https://v3.football.api-sports.io/standings?league=${league}&season=${season}`
-          : `https://v3.football.api-sports.io/fixtures?team=${team}&next=5`;
-
-      const r = await fetch(apiUrl, {
-        headers: { 'x-apisports-key': process.env.API_FOOTBALL_KEY }
-      });
-      remaining = r.headers.get('x-ratelimit-requests-remaining');
-      const json = await r.json();
-
-      const hayErrores = Array.isArray(json.errors)
-        ? json.errors.length > 0
-        : !!json.errors && Object.keys(json.errors).length > 0;
-
-      if (r.ok && !hayErrores && json.response?.length) {
-        res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=3600'); // 12 horas
-        return res.status(200).json({ origen: 'api_real', season, remaining, data: json.response });
-      }
-      lastErrors = json.errors;
+    if (cacheDatos[cleanKey] && (AHORA - ultimaActualizacion[cleanKey] < TIEMPO_CACHE)) {
+        return res.status(200).json({ origen: 'cache', data: cacheDatos[cleanKey] });
     }
 
-    // Sin Cache-Control: los errores no se guardan en caché
-    return res.status(200).json({ origen: 'api_real', remaining, errors: lastErrors, data: [] });
-  } catch (error) {
-    return res.status(500).json({ error: 'Error de conexión', details: error.message });
-  }
-}
+    let apiUrl = '';
+    if (type === 'today_matches') {
+        const fechaConsulta = date || new Date().toISOString().split('T')[0];
+        apiUrl = `https://api.sportapi.ai/v1/matches?date=${fechaConsulta}`;
+    } else if (type === 'search') {
+        if (!query.trim()) return res.status(400).json({ error: 'Ingresa un término a buscar' });
+        apiUrl = `https://api.sportapi.ai/v1/teams?search=${encodeURIComponent(query)}`;
+    } else if (type === 'matches') {
+        if (!id) return res.status(400).json({ error: 'Falta el identificador' });
+        apiUrl = `https://api.sportapi.ai/v1/teams/${id}/matches?limit=5`;
+    } else {
+        return res.status(400).json({ error: 'Tipo de consulta no soportado' });
+    }
 
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'X-Api-Key': process.env.SPORTAPI_KEY || process.env.API_FOOTBALL_KEY,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            return res.status(response.status).json({ 
+                error: errData.message || `Error del proveedor (HTTP ${response.status})` 
+            });
+        }
+
+        const data = await response.json();
+        const resultados = data.data || data.matches || data.teams || data;
+
+        cacheDatos[cleanKey] = resultados;
+        ultimaActualizacion[cleanKey] = AHORA;
+
+        return res.status(200).json({ origen: 'api_real', data: resultados });
+    } catch (error) {
+        return res.status(500).json({ error: 'Fallo de conexión', details: error.message });
+    }
+}

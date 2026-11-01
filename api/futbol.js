@@ -1,6 +1,7 @@
 let cacheDatos = {};
 let ultimaActualizacion = {};
 
+// Normaliza textos como "Real Madrid" a "real-madrid"
 function formatearSlug(texto) {
     return texto
         .toLowerCase()
@@ -28,10 +29,18 @@ export default async function handler(req, res) {
         return res.status(200).json({ origen: 'cache', data: cacheDatos[cleanKey] });
     }
 
-    const apiKey = (process.env.SPORTAPI_KEY || process.env.API_FOOTBALL_KEY || '').trim();
+    // Busca SPORTAPI_API_KEY, SPORTAPI_KEY o el nombre previo
+    const apiKey = (
+        process.env.SPORTAPI_API_KEY || 
+        process.env.SPORTAPI_KEY || 
+        process.env.API_FOOTBALL_KEY || 
+        ''
+    ).trim();
 
     if (!apiKey) {
-        return res.status(500).json({ error: 'Falta configurar la clave sk_live en Vercel.' });
+        return res.status(500).json({ 
+            error: 'Falta la clave en Vercel. Verifica que SPORTAPI_API_KEY tenga tu sk_live_... en Value.' 
+        });
     }
 
     let endpointUrl = '';
@@ -65,15 +74,14 @@ export default async function handler(req, res) {
             json = JSON.parse(rawText);
         } catch (e) {
             return res.status(response.status).json({
-                error: `HTTP ${response.status}: Respuesta no JSON`,
+                error: `HTTP ${response.status}: Respuesta no válida`,
                 detalle: rawText.substring(0, 160)
             });
         }
 
         if (!response.ok) {
             return res.status(response.status).json({
-                error: json.message || json.error || `Error ${response.status}`,
-                urlConsultada: endpointUrl,
+                error: json.message || json.error || `Error HTTP ${response.status}`,
                 detalles: json
             });
         }
@@ -99,3 +107,4 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Fallo al conectar', detalle: error.message });
     }
 }
+

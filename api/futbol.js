@@ -1,15 +1,14 @@
 let cacheDatos = {};
 let ultimaActualizacion = {};
 
-// Convierte texto como "Real Madrid" a "real-madrid"
 function formatearSlug(texto) {
     return texto
         .toLowerCase()
         .trim()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Quita tildes
-        .replace(/[^a-z0-9]+/g, '-')     // Cambia espacios o signos por guiones
-        .replace(/^-+|-+$/g, '');        // Quita guiones sobrantes
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
 }
 
 export default async function handler(req, res) {
@@ -23,31 +22,33 @@ export default async function handler(req, res) {
     const cleanKey = `${type}_${query || id || date}`.toLowerCase().trim();
     const AHORA = Date.now();
 
+    // Caché de 15 minutos para partidos y 6 horas para equipos
     const TIEMPO_CACHE = type === 'today_matches' ? 15 * 60 * 1000 : 6 * 60 * 60 * 1000;
 
-    if (cacheDatos[cleanKey] && (AHORA - ultimaActualizacion[cleanKey] < TIEMPO_CACHE)) {
+    if (cacheDatos[cleanKey] && Array.isArray(cacheDatos[cleanKey]) && cacheDatos[cleanKey].length > 0 && (AHORA - ultimaActualizacion[cleanKey] < TIEMPO_CACHE)) {
         return res.status(200).json({ origen: 'cache', data: cacheDatos[cleanKey] });
     }
 
-    const apiKey = process.env.SPORTAPI_KEY || process.env.API_FOOTBALL_KEY || '';
+    // Tomar la clave limpia
+    const apiKey = (process.env.SPORTAPI_KEY || process.env.API_FOOTBALL_KEY || '').trim();
+
     if (!apiKey) {
-        return res.status(500).json({ error: 'Falta configurar SPORTAPI_KEY en Vercel.' });
+        return res.status(500).json({ error: 'Falta configurar la clave sk_live en Vercel.' });
     }
 
     let endpointUrl = '';
+    const fecha = date || new Date().toISOString().split('T')[0];
 
     if (type === 'today_matches') {
-        const fecha = date || new Date().toISOString().split('T')[0];
         endpointUrl = `https://sportapi.ai/api/matches?date=${fecha}`;
     } else if (type === 'search') {
-        if (!query.trim()) return res.status(400).json({ error: 'Ingresa un nombre para buscar.' });
+        if (!query.trim()) return res.status(400).json({ error: 'Ingresa un nombre.' });
         const slug = formatearSlug(query);
         endpointUrl = `https://sportapi.ai/api/teams/slug/${slug}`;
     } else if (type === 'matches') {
         if (!id) return res.status(400).json({ error: 'Falta el ID del equipo.' });
         endpointUrl = `https://sportapi.ai/api/teams/${id}/matches`;
     } else {
-        const fecha = date || new Date().toISOString().split('T')[0];
         endpointUrl = `https://sportapi.ai/api/matches?date=${fecha}`;
     }
 
@@ -73,12 +74,11 @@ export default async function handler(req, res) {
 
         if (!response.ok) {
             return res.status(response.status).json({
-                error: json.message || `Error HTTP ${response.status}`,
+                error: json.message || `Error HTTP ${response.status} de SportAPI`,
                 detalles: json
             });
         }
 
-        // Si devuelve un solo equipo (objeto), se empaqueta en lista para que la interfaz lo dibuje
         let lista = [];
         if (Array.isArray(json)) {
             lista = json;
@@ -86,12 +86,14 @@ export default async function handler(req, res) {
             lista = json.data;
         } else if (Array.isArray(json.matches)) {
             lista = json.matches;
-        } else if (typeof json === 'object') {
-            lista = [json.data || json];
+        } else if (typeof json === 'object' && (json.id || json.name || json.slug)) {
+            lista = [json];
         }
 
-        cacheDatos[cleanKey] = lista;
-        ultimaActualizacion[cleanKey] = AHORA;
+        if (lista.length > 0) {
+            cacheDatos[cleanKey] = lista;
+            ultimaActualizacion[cleanKey] = AHORA;
+        }
 
         return res.status(200).json({ origen: 'api_real', data: lista });
     } catch (error) {

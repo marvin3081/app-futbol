@@ -1,78 +1,62 @@
-let cacheDatos = {};
-let ultimaActualizacion = {};
+const BASE = 'https://sportapi.ai/api';
 
 export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
+  const key = process.env.SPORTAPI_KEY;
+  if (!key) return res.status(500).json({ error: 'Falta SPORTAPI_KEY en Vercel' });
 
-    const { type = 'search', query = '', id = '', date = '' } = req.query;
-    const cleanKey = `${type}_${query || id || date}`.toLowerCase().trim();
-    const AHORA = Date.now();
+  const { type = 'leagues', slug = '', id = '', league = '', date = '' } = req.query;
 
-    const TIEMPO_CACHE = type === 'today_matches' ? 15 * 60 * 1000 : (type === 'search' ? 6 * 60 * 60 * 1000 : 30 * 60 * 1000);
+  const okSlug = /^[a-z0-9-]+$/;
+  let path, ttl;
 
-    if (cacheDatos[cleanKey] && (AHORA - ultimaActualizacion[cleanKey] < TIEMPO_CACHE)) {
-        return res.status(200).json({ origen: 'cache', data: cacheDatos[cleanKey] });
+  if (type === 'leagues') {
+    path = '/leagues'; ttl = 86400;
+  } else if (type === 'league') {
+    if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'id inválido' });
+    path = `/leagues/${id}`; ttl = 21600;
+  } else if (type === 'standings') {
+    if (!okSlug.test(league)) return res.status(400).json({ error: 'league inválida' });
+    path = `/standings/${league}`; ttl = 21600;
+  } else if (type === 'team') {
+    if (!okSlug.test(slug)) return res.status(400).json({ error: 'slug inválido' });
+    path = `/teams/slug/${slug}`; ttl = 3600;
+  } else if (type === 'team_id') {
+    if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'id inválido' });
+    path = `/teams/${id}`; ttl = 3600;
+  } else if (type === 'day') {
+    const f = date || new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return res.status(400).json({ error: 'fecha inválida' });
+    path = `/fixtures/date/${f}`; ttl = 900;
+  } else {
+    return res.status(400).json({ error: 'Tipo no soportado' });
+  }
+
+  try {
+    const r = await fetch(BASE + path, {
+      headers: { 'X-Api-Key': key, 'Accept': 'application/json' }
+    });
+    const texto = await r.text();
+    let json;
+    try { json = JSON.parse(texto); } catch { json = null; }
+
+    const remaining = r.headers.get('x-ratelimit-remaining');
+    const monthRemaining = r.headers.get('x-ratelimit-month-remaining');
+
+    if (!r.ok || !json || json.success === false) {
+      // Sin Cache-Control: los errores no se guardan en caché
+      return res.status(r.status === 200 ? 502 : r.status).json({
+        error: json?.error || `SportAPI respondió ${r.status}`,
+        path, remaining, monthRemaining
+      });
     }
 
-    const BASE_URL = 'https://sportapi.ai/api/v1';
-    let apiUrl = '';
-
-    if (type === 'today_matches') {
-        const fecha = date || new Date().toISOString().split('T')[0];
-        apiUrl = `${BASE_URL}/matches?date=${fecha}`;
-    } else if (type === 'search') {
-        if (!query.trim()) return res.status(400).json({ error: 'Ingresa un término a buscar' });
-        apiUrl = `${BASE_URL}/teams?search=${encodeURIComponent(query)}`;
-    } else if (type === 'matches') {
-        if (!id) return res.status(400).json({ error: 'Falta el identificador del equipo' });
-        apiUrl = `${BASE_URL}/teams/${id}/matches?limit=5`;
-    } else {
-        return res.status(400).json({ error: 'Tipo de consulta no soportado' });
-    }
-
-    try {
-        const apiKey = process.env.SPORTAPI_KEY || process.env.API_FOOTBALL_KEY || '';
-
-        const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-                'X-Api-Key': apiKey,
-                'Accept': 'application/json'
-            }
-        });
-
-        const rawText = await response.text();
-        let jsonResponse;
-
-        try {
-            jsonResponse = JSON.parse(rawText);
-        } catch (e) {
-            return res.status(response.status).json({
-                error: `HTTP ${response.status}: Respuesta inesperada del servicio`,
-                url: apiUrl,
-                preview: rawText.substring(0, 160)
-            });
-        }
-
-        if (!response.ok) {
-            return res.status(response.status).json({
-                error: jsonResponse.message || `Error del proveedor (HTTP ${response.status})`,
-                detalles: jsonResponse,
-                url: apiUrl
-            });
-        }
-
-        // SportAPI suele entregar listas en .data o en el cuerpo raíz
-        const dataFinal = jsonResponse.data || jsonResponse.teams || jsonResponse.matches || jsonResponse;
-
-        cacheDatos[cleanKey] = dataFinal;
-        ultimaActualizacion[cleanKey] = AHORA;
-
-        return res.status(200).json({ origen: 'api_real', data: dataFinal });
-    } catch (error) {
-        return res.status(500).json({ error: 'Fallo de conexión', details: error.message });
-    }
+    res.setHeader('Cache-Control', `s-maxage=${ttl}, stale-while-revalidate=600`);
+    return res.status(200).json({ ...json, remaining, monthRemaining });
+  } catch (e) {
+    return res.status(500).json({ error: 'Error de conexión', details: e.message });
+  }
 }

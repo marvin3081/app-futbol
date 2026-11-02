@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const key = (process.env.SPORTAPI_API_KEY || process.env.SPORTAPI_KEY || '').trim();
   if (!key) return res.status(500).json({ error: 'Falta SPORTAPI_API_KEY en Vercel' });
 
-  const { type = 'leagues', slug = '', id = '', league = '', date = '', a = '', b = '' } = req.query;
+  const { type = 'leagues', slug = '', id = '', league = '', date = '', a = '', b = '', limit = '' } = req.query;
 
   const okSlug = /^[a-z0-9-]+$/;
   let path, ttl;
@@ -21,6 +21,10 @@ export default async function handler(req, res) {
   } else if (type === 'standings') {
     if (!okSlug.test(league)) return res.status(400).json({ error: 'league inválida' });
     path = `/standings/${league}`; ttl = 3600;
+  } else if (type === 'scorers') {
+    if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'id inválido' });
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 30);
+    path = `/leagues/${id}/topscorers?limit=${lim}`; ttl = 10800;
   } else if (type === 'team') {
     if (!okSlug.test(slug)) return res.status(400).json({ error: 'slug inválido' });
     path = `/teams/slug/${slug}`; ttl = 3600;

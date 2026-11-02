@@ -10,7 +10,7 @@
   <div class="max-w-2xl mx-auto space-y-4">
     <header class="text-center py-3 border-b border-slate-800">
       <h1 class="text-2xl font-bold text-emerald-400">⚽ App de Fútbol</h1>
-      <p class="text-slate-400 text-sm">Partidos de hoy, competiciones, equipos y comparaciones</p>
+      <p class="text-slate-400 text-sm">Partidos, competiciones, goleadores, equipos y comparaciones</p>
     </header>
 
     <!-- Buscar equipo -->
@@ -510,12 +510,13 @@
       $('btnLiga').disabled = true;
       cont.innerHTML = '<div class="py-12 text-center text-slate-500">Cargando competición...</div>';
       try {
-        const [st, det] = await Promise.all([
+        const [st, det, sc] = await Promise.all([
           api({ type: 'standings', league: id }),
-          api({ type: 'league', id }).catch(() => null)
+          api({ type: 'league', id }).catch(() => null),
+          api({ type: 'scorers', id, limit: 10 }).catch(() => null)
         ]);
         setStatus(st);
-        renderLiga(id, nombre, st.data || [], det);
+        renderLiga(id, nombre, st.data || [], det, sc);
       } catch (err) {
         cont.innerHTML = cajaError(err.message);
       } finally {
@@ -536,8 +537,30 @@
         <td class="py-2 text-center font-bold">${esc(r.points)}</td></tr>`;
     }
 
-    function renderLiga(id, nombre, filas, det) {
-      const grupos = filas[0]?.table ? filas : [{ group: '', table: filas }];
+    function filaGoleador(p) {
+      return `<tr class="hover:bg-slate-800/80">
+        <td class="py-2 font-bold text-slate-400">${esc(p.rank)}</td>
+        <td class="py-2">
+          <div>${esc(p.player_name)}</div>
+          <button class="team-link text-[11px] text-slate-500 hover:text-emerald-400" data-id="${esc(p.team_id)}" data-name="${esc(p.team_name)}">${esc(p.team_name)}</button>
+        </td>
+        <td class="py-2 text-center font-bold">${esc(p.goals)}</td>
+        <td class="py-2 text-center text-slate-400">${esc(p.penalties ?? 0)}</td></tr>`;
+    }
+
+    function renderLiga(id, nombre, filas, det, sc) {
+      let grupos;
+      if (filas[0]?.table) {
+        grupos = filas;
+      } else {
+        const mapa = new Map();
+        filas.forEach(r => {
+          const g = r.group || '';
+          if (!mapa.has(g)) mapa.set(g, []);
+          mapa.get(g).push(r);
+        });
+        grupos = [...mapa].map(([group, table]) => ({ group, table }));
+      }
       const total = grupos.reduce((n, g) => n + g.table.length, 0);
 
       const tablas = total ? grupos.map(g => `
@@ -554,6 +577,17 @@
         ? '<p class="text-[11px] text-slate-500 mt-2"><span class="text-emerald-400">●</span> 1-8 octavos · <span class="text-amber-400">●</span> 9-24 playoff · <span class="text-red-400">●</span> eliminados</p>'
         : '';
 
+      const goleadores = Array.isArray(sc?.data) ? sc.data : [];
+      const bloqueGoleadores = goleadores.length
+        ? `<table class="w-full text-left text-sm">
+            <thead class="text-slate-400 border-b border-slate-700 text-xs">
+              <tr><th class="pb-1">#</th><th class="pb-1">Jugador</th><th class="pb-1 text-center">Goles</th><th class="pb-1 text-center">Pen.</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">${goleadores.map(filaGoleador).join('')}</tbody>
+          </table>
+          ${sc?.season_from ? `<p class="text-[11px] text-slate-500 mt-2">Temporada desde ${esc(sc.season_from)}</p>` : ''}`
+        : '<p class="text-sm text-slate-500 py-2">Sin datos de goleadores para esta competición.</p>';
+
       const prox = (det?.upcoming_fixtures || []).slice(0, 6);
       const rec = (det?.recent_results || []).slice(0, 6);
 
@@ -561,6 +595,10 @@
         <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 overflow-x-auto">
           <h2 class="text-lg font-bold text-emerald-400 mb-2">${esc(nombre)}</h2>
           ${tablas}${leyenda}
+        </div>
+        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
+          <h3 class="text-sm font-semibold text-slate-200 mb-2">⚽ Goleadores</h3>
+          ${bloqueGoleadores}
         </div>
         <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
           <h3 class="text-sm font-semibold text-slate-200 mb-1">Próximos partidos</h3>
@@ -610,3 +648,4 @@
   </script>
 </body>
 </html>
+      

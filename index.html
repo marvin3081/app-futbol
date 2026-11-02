@@ -10,9 +10,10 @@
   <div class="max-w-2xl mx-auto space-y-4">
     <header class="text-center py-3 border-b border-slate-800">
       <h1 class="text-2xl font-bold text-emerald-400">⚽ App de Fútbol</h1>
-      <p class="text-slate-400 text-sm">Partidos de hoy, competiciones y estadísticas por equipo</p>
+      <p class="text-slate-400 text-sm">Partidos de hoy, competiciones, equipos y comparaciones</p>
     </header>
 
+    <!-- Buscar equipo -->
     <div class="flex gap-2">
       <label for="searchInput" class="sr-only">Equipo</label>
       <input id="searchInput" type="text" placeholder="Equipo (ej. Arsenal, Manchester City)"
@@ -21,6 +22,18 @@
     </div>
     <p class="text-[11px] text-slate-500">Escribe el nombre en inglés, como aparece en la lista de partidos.</p>
 
+    <!-- Comparar dos equipos -->
+    <div class="flex gap-2">
+      <label for="vsA" class="sr-only">Equipo 1</label>
+      <input id="vsA" type="text" placeholder="Equipo 1"
+        class="min-w-0 flex-1 bg-slate-800 text-white p-3 rounded-lg border border-slate-700 placeholder-slate-500 text-sm">
+      <label for="vsB" class="sr-only">Equipo 2</label>
+      <input id="vsB" type="text" placeholder="Equipo 2"
+        class="min-w-0 flex-1 bg-slate-800 text-white p-3 rounded-lg border border-slate-700 placeholder-slate-500 text-sm">
+      <button id="btnVs" class="bg-sky-600 hover:bg-sky-500 px-4 rounded-lg font-bold disabled:opacity-50">VS</button>
+    </div>
+
+    <!-- Competiciones -->
     <div class="flex gap-2">
       <label for="ligaSelect" class="sr-only">Competición</label>
       <select id="ligaSelect" class="bg-slate-800 text-white p-3 rounded-lg w-full border border-slate-700">
@@ -35,6 +48,7 @@
 
     <section id="vistaHoy" class="space-y-3">
       <h2 class="text-lg font-semibold text-slate-200">Partidos de hoy</h2>
+      <p class="text-[11px] text-slate-500">Toca un equipo para ver sus estadísticas o VS para compararlos.</p>
       <div id="contenedorHoy"><div class="py-8 text-center text-slate-500">Cargando partidos...</div></div>
     </section>
 
@@ -46,6 +60,11 @@
     <section id="vistaLiga" class="space-y-3 hidden">
       <button id="btnVolver2" class="text-sm text-emerald-400">← Volver a partidos de hoy</button>
       <div id="contenedorLiga"></div>
+    </section>
+
+    <section id="vistaVs" class="space-y-3 hidden">
+      <button id="btnVolver3" class="text-sm text-emerald-400">← Volver a partidos de hoy</button>
+      <div id="contenedorVs"></div>
     </section>
   </div>
 
@@ -61,10 +80,13 @@
     const cajaError = msg =>
       `<div class="p-4 bg-red-950/40 border border-red-800 rounded-xl text-center text-red-300 text-xs">${esc(msg)}</div>`;
 
+    const FINALIZADOS = ['FT', 'AET', 'PENS'];
+
     function mostrarVista(vista) {
       $('vistaHoy').classList.toggle('hidden', vista !== 'hoy');
       $('vistaEquipo').classList.toggle('hidden', vista !== 'equipo');
       $('vistaLiga').classList.toggle('hidden', vista !== 'liga');
+      $('vistaVs').classList.toggle('hidden', vista !== 'vs');
     }
 
     function setStatus(json) {
@@ -105,6 +127,7 @@
       return f ? String(f).slice(5).replace('-', '/') : '';
     }
 
+    /* ---------- Partidos de hoy ---------- */
     async function cargarHoy() {
       const cont = $('contenedorHoy');
       try {
@@ -147,7 +170,7 @@
       if (m.status === 'LIVE') {
         estado = `<span class="text-red-400">${esc(m.minute || 'VIVO')}</span>`;
         centro = `${esc(m.home_score ?? 0)} - ${esc(m.away_score ?? 0)}`;
-      } else if (['FT', 'AET', 'PENS'].includes(m.status)) {
+      } else if (FINALIZADOS.includes(m.status)) {
         estado = esc(m.status);
         centro = `${esc(m.home_score)} - ${esc(m.away_score)}`;
       } else if (m.status === 'Scheduled') {
@@ -163,9 +186,14 @@
           <button class="team-link flex-1 text-right truncate hover:text-emerald-400" data-id="${esc(m.home_id)}" data-name="${esc(m.home_team)}">${esc(m.home_team)}</button>
           <span class="font-bold w-12 text-center">${centro}</span>
           <button class="team-link flex-1 text-left truncate hover:text-emerald-400" data-id="${esc(m.away_id)}" data-name="${esc(m.away_team)}">${esc(m.away_team)}</button>
+          <button class="vs-btn text-[10px] font-bold px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 text-white"
+            data-h="${esc(m.home_id)}" data-hn="${esc(m.home_team)}"
+            data-a="${esc(m.away_id)}" data-an="${esc(m.away_team)}"
+            data-l="${esc(m.league_id)}">VS</button>
         </div>`;
     }
 
+    /* ---------- Ficha de equipo ---------- */
     async function buscarEquipo(query, id) {
       const cont = $('contenedorEquipo');
       const btn = $('btnBuscar');
@@ -205,7 +233,7 @@
           const todos = Array.isArray(data.matches) ? data.matches : [];
           proximos = todos.filter(m => m.status === 'Scheduled')
             .sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(0, 5);
-          resultados = todos.filter(m => ['FT', 'AET', 'PENS'].includes(m.status))
+          resultados = todos.filter(m => FINALIZADOS.includes(m.status))
             .sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 5);
           ligaId = team.league_id ?? data.leagues?.[0]?.id;
         } else {
@@ -297,6 +325,162 @@
         </div>`;
     }
 
+    /* ---------- Comparación (VS) ---------- */
+    async function resolverEquipo(nombre) {
+      const q = aSlug(nombre);
+      try {
+        const d = await api({ type: 'team', slug: q });
+        return { id: d.team.id, name: d.team.name, leagueId: d.team.league?.id };
+      } catch (e) {
+        if (e.status !== 404) throw e;
+        const hit = partidosHoy.find(m => aSlug(m.home_team).includes(q))
+                 || partidosHoy.find(m => aSlug(m.away_team).includes(q));
+        if (!hit) return null;
+        const esLocal = aSlug(hit.home_team).includes(q);
+        return {
+          id: esLocal ? hit.home_id : hit.away_id,
+          name: esLocal ? hit.home_team : hit.away_team,
+          leagueId: hit.league_id
+        };
+      }
+    }
+
+    async function lanzarVs() {
+      const a = $('vsA').value.trim();
+      const b = $('vsB').value.trim();
+      if (!a || !b) return;
+      const cont = $('contenedorVs');
+      $('btnVs').disabled = true;
+      mostrarVista('vs');
+      cont.innerHTML = '<div class="py-12 text-center text-slate-500">Buscando equipos...</div>';
+      try {
+        const [A, B] = await Promise.all([resolverEquipo(a), resolverEquipo(b)]);
+        if (!A || !B) {
+          cont.innerHTML = `<div class="py-8 text-center text-slate-400 text-sm">No encontré "${esc(!A ? a : b)}". Prueba el nombre en inglés o usa el botón VS de la lista de hoy.</div>`;
+          return;
+        }
+        await compararEquipos(A, B);
+      } catch (err) {
+        cont.innerHTML = cajaError(err.message);
+      } finally {
+        $('btnVs').disabled = false;
+      }
+    }
+
+    async function compararEquipos(A, B) {
+      const cont = $('contenedorVs');
+      mostrarVista('vs');
+      if (String(A.id) === String(B.id)) {
+        cont.innerHTML = cajaError('Elige dos equipos distintos.');
+        return;
+      }
+      cont.innerHTML = '<div class="py-12 text-center text-slate-500">Comparando equipos...</div>';
+      try {
+        const ligas = [...new Set([A.leagueId, B.leagueId].filter(Boolean).map(String))];
+        const [h, ...sts] = await Promise.all([
+          api({ type: 'h2h', a: A.id, b: B.id }),
+          ...ligas.map(l => api({ type: 'standings', league: l }).catch(() => null))
+        ]);
+        setStatus(h);
+        const filas = sts.filter(Boolean)
+          .flatMap(st => (st.data || []).flatMap(r => r.table ? r.table : [r]));
+        const filaA = filas.find(r => Number(r.team?.id) === Number(A.id)) || null;
+        const filaB = filas.find(r => Number(r.team?.id) === Number(B.id)) || null;
+        renderVs(A, B, Array.isArray(h.data) ? h.data : [], filaA, filaB);
+      } catch (err) {
+        cont.innerHTML = cajaError(err.message);
+      }
+    }
+
+    function filaComp(etiqueta, va, vb) {
+      return `<div class="grid grid-cols-3 items-center text-center py-2">
+        <span class="font-bold">${esc(va)}</span>
+        <span class="text-xs text-slate-400">${etiqueta}</span>
+        <span class="font-bold">${esc(vb)}</span></div>`;
+    }
+
+    function renderVs(A, B, partidos, filaA, filaB) {
+      const jugados = partidos.filter(m => FINALIZADOS.includes(m.status) && m.home_score != null);
+      let wa = 0, wb = 0, emp = 0, ga = 0, gb = 0;
+
+      jugados.forEach(m => {
+        const aLocal = Number(m.home_id) === Number(A.id);
+        const gA = aLocal ? m.home_score : m.away_score;
+        const gB = aLocal ? m.away_score : m.home_score;
+        ga += gA; gb += gB;
+        if (gA > gB) wa++; else if (gB > gA) wb++; else emp++;
+      });
+
+      const total = jugados.length;
+      const prox = partidos.filter(m => m.status === 'Scheduled')
+        .sort((x, y) => String(x.date).localeCompare(String(y.date)))[0];
+      const ultimos = [...jugados]
+        .sort((x, y) => String(y.date).localeCompare(String(x.date))).slice(0, 5);
+
+      const v = (f, campo, sufijo = '') => f && f[campo] != null ? f[campo] + sufijo : '—';
+
+      const formaDe = f => Array.isArray(f?.form) && f.form.length
+        ? f.form.map(x => chipForma(x.result)).join('')
+        : '<span class="text-slate-500 text-xs">—</span>';
+
+      const bloqueH2H = total
+        ? `
+          <div class="flex h-3 rounded overflow-hidden bg-slate-700 mb-3">
+            <div class="bg-emerald-500" style="flex:${wa} 1 0"></div>
+            <div class="bg-slate-500" style="flex:${emp} 1 0"></div>
+            <div class="bg-sky-500" style="flex:${wb} 1 0"></div>
+          </div>
+          <div class="grid grid-cols-3 text-center">
+            <div><div class="text-2xl font-bold text-emerald-400">${wa}</div><div class="text-[11px] text-slate-400">Victorias ${esc(A.name)}</div></div>
+            <div><div class="text-2xl font-bold text-slate-300">${emp}</div><div class="text-[11px] text-slate-400">Empates</div></div>
+            <div><div class="text-2xl font-bold text-sky-400">${wb}</div><div class="text-[11px] text-slate-400">Victorias ${esc(B.name)}</div></div>
+          </div>
+          <div class="grid grid-cols-3 text-center mt-3 text-sm">
+            <span class="font-bold">${ga}</span><span class="text-xs text-slate-400">Goles (${total} partidos)</span><span class="font-bold">${gb}</span>
+          </div>
+          <p class="text-[11px] text-slate-500 text-center mt-2">Promedio de goles por partido: ${(Math.round((ga + gb) / total * 10) / 10)}</p>`
+        : '<p class="text-sm text-slate-500">No hay enfrentamientos directos registrados entre estos equipos.</p>';
+
+      $('contenedorVs').innerHTML = `
+        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 text-center">
+          <div class="flex items-center justify-center gap-3">
+            <span class="flex-1 text-right font-bold text-emerald-400 truncate">${esc(A.name)}</span>
+            <span class="text-xs font-bold bg-slate-700 rounded px-2 py-1">VS</span>
+            <span class="flex-1 text-left font-bold text-sky-400 truncate">${esc(B.name)}</span>
+          </div>
+          ${prox ? `<p class="text-xs text-slate-400 mt-2">Próximo duelo: ${esc(prox.date)}${prox.league_name ? ' · ' + esc(prox.league_name) : ''}</p>` : ''}
+        </div>
+
+        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
+          <h3 class="text-sm font-semibold text-slate-200 mb-1">Temporada actual</h3>
+          <div class="divide-y divide-slate-800">
+            ${filaComp('Posición', v(filaA, 'position', '°'), v(filaB, 'position', '°'))}
+            ${filaComp('Puntos', v(filaA, 'points'), v(filaB, 'points'))}
+            ${filaComp('PJ', v(filaA, 'played'), v(filaB, 'played'))}
+            ${filaComp('Dif. goles', v(filaA, 'goal_difference'), v(filaB, 'goal_difference'))}
+            ${filaComp('Goles a favor', v(filaA, 'goals_for'), v(filaB, 'goals_for'))}
+            ${filaComp('Goles en contra', v(filaA, 'goals_against'), v(filaB, 'goals_against'))}
+          </div>
+          <div class="grid grid-cols-3 items-center text-center pt-2">
+            <div class="flex justify-center gap-1 flex-wrap">${formaDe(filaA)}</div>
+            <span class="text-xs text-slate-400">Forma</span>
+            <div class="flex justify-center gap-1 flex-wrap">${formaDe(filaB)}</div>
+          </div>
+          ${(!filaA || !filaB) ? '<p class="text-[11px] text-slate-500 text-center mt-3">Si falta algún dato, ese equipo no aparece en la tabla de su liga.</p>' : ''}
+        </div>
+
+        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
+          <h3 class="text-sm font-semibold text-slate-200 mb-3">Enfrentamientos directos</h3>
+          ${bloqueH2H}
+        </div>
+
+        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50">
+          <h3 class="text-sm font-semibold text-slate-200 mb-1">Últimos enfrentamientos</h3>
+          <div class="divide-y divide-slate-800">${ultimos.length ? ultimos.map(lineaPartido).join('') : '<p class="text-sm text-slate-500 py-2">Sin partidos anteriores.</p>'}</div>
+        </div>`;
+    }
+
+    /* ---------- Competiciones ---------- */
     async function cargarLigas() {
       try {
         const json = await api({ type: 'leagues' });
@@ -388,6 +572,7 @@
         </div>`;
     }
 
+    /* ---------- Eventos ---------- */
     function lanzarBusqueda() {
       const q = $('searchInput').value.trim();
       if (q) buscarEquipo(q);
@@ -395,10 +580,25 @@
 
     $('btnBuscar').addEventListener('click', lanzarBusqueda);
     $('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') lanzarBusqueda(); });
+    $('btnVs').addEventListener('click', lanzarVs);
+    $('vsB').addEventListener('keydown', e => { if (e.key === 'Enter') lanzarVs(); });
     $('btnLiga').addEventListener('click', verLiga);
     $('btnVolver').addEventListener('click', () => mostrarVista('hoy'));
     $('btnVolver2').addEventListener('click', () => mostrarVista('hoy'));
+    $('btnVolver3').addEventListener('click', () => mostrarVista('hoy'));
+
     document.addEventListener('click', e => {
+      const vs = e.target.closest('.vs-btn');
+      if (vs) {
+        const d = vs.dataset;
+        $('vsA').value = d.hn;
+        $('vsB').value = d.an;
+        compararEquipos(
+          { id: d.h, name: d.hn, leagueId: d.l },
+          { id: d.a, name: d.an, leagueId: d.l }
+        );
+        return;
+      }
       const b = e.target.closest('.team-link');
       if (!b) return;
       $('searchInput').value = b.dataset.name;

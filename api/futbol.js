@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const key = (process.env.SPORTAPI_API_KEY || process.env.SPORTAPI_KEY || '').trim();
   if (!key) return res.status(500).json({ error: 'Falta SPORTAPI_API_KEY en Vercel' });
 
-  const { type = 'leagues', slug = '', id = '', league = '', date = '' } = req.query;
+  const { type = 'leagues', slug = '', id = '', league = '', date = '', a = '', b = '' } = req.query;
 
   const okSlug = /^[a-z0-9-]+$/;
   let path, ttl;
@@ -20,13 +20,16 @@ export default async function handler(req, res) {
     path = `/leagues/${id}`; ttl = 21600;
   } else if (type === 'standings') {
     if (!okSlug.test(league)) return res.status(400).json({ error: 'league inválida' });
-    path = `/standings/${league}`; ttl = 21600;
+    path = `/standings/${league}`; ttl = 3600;
   } else if (type === 'team') {
     if (!okSlug.test(slug)) return res.status(400).json({ error: 'slug inválido' });
     path = `/teams/slug/${slug}`; ttl = 3600;
   } else if (type === 'team_id') {
     if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'id inválido' });
     path = `/teams/${id}`; ttl = 3600;
+  } else if (type === 'h2h') {
+    if (!/^\d+$/.test(a) || !/^\d+$/.test(b)) return res.status(400).json({ error: 'equipos inválidos' });
+    path = `/fixtures/h2h/${a}/${b}`; ttl = 21600;
   } else if (type === 'day') {
     const f = date || new Date().toISOString().slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return res.status(400).json({ error: 'fecha inválida' });
